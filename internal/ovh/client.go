@@ -13,6 +13,7 @@ import (
 // caller est la partie de *goovh.Client utilisée ici (remplaçable en test).
 type caller interface {
 	GetWithContext(ctx context.Context, url string, res interface{}) error
+	GetUnAuthWithContext(ctx context.Context, url string, res interface{}) error
 	PostWithContext(ctx context.Context, url string, body, res interface{}) error
 }
 
@@ -72,6 +73,55 @@ func (c *client) Senders(ctx context.Context, service string) ([]Sender, error) 
 		out = append(out, s)
 	}
 	return out, nil
+}
+
+func (c *client) EstimateMessage(ctx context.Context, message string, stopClause bool, senderType string) (MessageEstimate, error) {
+	body := map[string]interface{}{"message": message, "noStopClause": !stopClause, "senderType": senderType}
+	var out struct {
+		Characters int    `json:"characters"`
+		Class      string `json:"charactersClass"`
+		PerPart    int    `json:"maxCharactersPerPart"`
+		Parts      int    `json:"parts"`
+	}
+	if err := c.api.PostWithContext(ctx, "/sms/estimate", body, &out); err != nil {
+		return MessageEstimate{}, classify(err)
+	}
+	return MessageEstimate{Characters: out.Characters, Encoding: out.Class, PerPart: out.PerPart, Parts: out.Parts}, nil
+}
+
+func rateQuery(billing, country string) string {
+	return "?" + url.Values{"billingCountry": {billing}, "country": {country}}.Encode()
+}
+
+func (c *client) DestinationRate(ctx context.Context, billing, country string) (DestinationRate, error) {
+	var out struct {
+		Credit float64 `json:"credit"`
+		Price  struct {
+			Value    float64 `json:"value"`
+			Currency string  `json:"currencyCode"`
+		} `json:"price"`
+	}
+	if err := c.api.GetUnAuthWithContext(ctx, "/sms/rates/destinations"+rateQuery(billing, country), &out); err != nil {
+		return DestinationRate{}, classify(err)
+	}
+	return DestinationRate{Country: country, CreditsPerSMS: out.Credit, PricePerSMS: out.Price.Value, Currency: out.Price.Currency}, nil
+}
+
+func (c *client) PackTiers(ctx context.Context, billing, country string) ([]PackTier, error) {
+	var out []struct {
+		Min   int64 `json:"creditQuantityMin"`
+		Price struct {
+			Value float64 `json:"value"`
+		} `json:"smsPrice"`
+	}
+	if err := c.api.GetUnAuthWithContext(ctx, "/sms/rates/packs"+rateQuery(billing, country), &out); err != nil {
+		return nil, classify(err)
+	}
+	tiers := make([]PackTier, 0, len(out))
+	for _, t := range out {
+		tiers = append(tiers, PackTier{CreditsMin: t.Min, PricePerSMS: t.Price.Value})
+	}
+	return tiers, nil
 }
 
 type jobBody struct {

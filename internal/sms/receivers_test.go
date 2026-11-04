@@ -45,3 +45,14 @@ func TestParseReceivers(t *testing.T) {
 		t.Fatalf("empty = %+v", e)
 	}
 }
+
+func TestCountryOf(t *testing.T) {
+	for in, want := range map[string]string{
+		"+33612345678": "fr", "+14155552671": "us", "+447911123456": "gb",
+		"+262692123456": "re", "+351912345678": "pt", "+9999999999": "",
+	} {
+		if got := CountryOf(in); got != want {
+			t.Errorf("CountryOf(%s) = %q, want %q", in, got, want)
+		}
+	}
+}

@@ -14,6 +14,10 @@ import (
 	"smsh/internal/sms"
 )
 
+// MaxOneShotRecipients est le nombre maximal de destinataires d'un envoi unitaire
+// (les campagnes ne sont pas concernées).
+const MaxOneShotRecipients = 5
+
 // ClientFactory construit un client OVH à partir de credentials.
 type ClientFactory func(ovh.Credentials) (ovh.Client, error)
 
@@ -22,6 +26,8 @@ type Service struct {
 	Creds     *creds.Manager
 	NewClient ClientFactory
 	Now       func() time.Time
+
+	rates rateCache
 }
 
 // New crée un Service branché sur la vraie API OVH.
@@ -131,6 +137,11 @@ func (s *Service) Send(ctx context.Context, in SendInput) (SendOutcome, error) {
 	}
 	if len(rcpt.Valid) == 0 {
 		return SendOutcome{}, &ovh.Error{Kind: ovh.KindInvalidReceiver, Message: "Aucun destinataire."}
+	}
+	if len(rcpt.Valid) > MaxOneShotRecipients {
+		return SendOutcome{}, &ovh.Error{Kind: ovh.KindInvalidRequest,
+			Message: fmt.Sprintf("Un envoi unitaire est limité à %d destinataires (%d saisis) : utilisez une campagne.",
+				MaxOneShotRecipients, len(rcpt.Valid))}
 	}
 	at, err := s.parseSendAt(in.SendAt)
 	if err != nil {

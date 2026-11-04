@@ -58,6 +58,39 @@ func (m *Mock) Senders(context.Context, string) ([]Sender, error) {
 	return m.List, nil
 }
 
+func (m *Mock) EstimateMessage(_ context.Context, message string, _ bool, _ string) (MessageEstimate, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return MessageEstimate{}, m.Err
+	}
+	n := len([]rune(message))
+	return MessageEstimate{Characters: n, Encoding: "7bits", PerPart: 160, Parts: (n + 152) / 153}, nil
+}
+
+// DestinationRate : fictif — 1 crédit en France, 0,35 aux États-Unis, 2 ailleurs.
+func (m *Mock) DestinationRate(_ context.Context, _, country string) (DestinationRate, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return DestinationRate{}, m.Err
+	}
+	credits := map[string]float64{"fr": 1, "us": 0.35}[country]
+	if credits == 0 {
+		credits = 2
+	}
+	return DestinationRate{Country: country, CreditsPerSMS: credits, PricePerSMS: 0.06 * credits, Currency: "EUR"}, nil
+}
+
+func (m *Mock) PackTiers(context.Context, string, string) ([]PackTier, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return []PackTier{{CreditsMin: 100, PricePerSMS: 0.06}, {CreditsMin: 5000, PricePerSMS: 0.05}}, nil
+}
+
 func (m *Mock) Send(_ context.Context, req SendRequest) (SendResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -93,6 +93,7 @@ export namespace ovh {
 	
 	export class Sender {
 	    name: string;
+	    type: string;
 	    status: string;
 	
 	    static createFrom(source: any = {}) {
@@ -102,6 +103,7 @@ export namespace ovh {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.type = source["type"];
 	        this.status = source["status"];
 	    }
 	}
@@ -109,6 +111,99 @@ export namespace ovh {
 }
 
 export namespace service {
+	
+	export class CostLine {
+	    country: string;
+	    recipients: number;
+	    creditsPerSms: number;
+	    credits: number;
+	    priceMin: number;
+	    priceMax: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CostLine(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.country = source["country"];
+	        this.recipients = source["recipients"];
+	        this.creditsPerSms = source["creditsPerSms"];
+	        this.credits = source["credits"];
+	        this.priceMin = source["priceMin"];
+	        this.priceMax = source["priceMax"];
+	    }
+	}
+	export class CostEstimate {
+	    characters: number;
+	    encoding: string;
+	    perPart: number;
+	    parts: number;
+	    recipients: number;
+	    lines: CostLine[];
+	    totalCredits: number;
+	    priceMin: number;
+	    priceMax: number;
+	    currency: string;
+	    unknown: string[];
+	    warning: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CostEstimate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.characters = source["characters"];
+	        this.encoding = source["encoding"];
+	        this.perPart = source["perPart"];
+	        this.parts = source["parts"];
+	        this.recipients = source["recipients"];
+	        this.lines = this.convertValues(source["lines"], CostLine);
+	        this.totalCredits = source["totalCredits"];
+	        this.priceMin = source["priceMin"];
+	        this.priceMax = source["priceMax"];
+	        this.currency = source["currency"];
+	        this.unknown = source["unknown"];
+	        this.warning = source["warning"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CostInput {
+	    message: string;
+	    recipients: string;
+	    senderType: string;
+	    stopClause: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CostInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.message = source["message"];
+	        this.recipients = source["recipients"];
+	        this.senderType = source["senderType"];
+	        this.stopClause = source["stopClause"];
+	    }
+	}
 	
 	export class SendInput {
 	    message: string;

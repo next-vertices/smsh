@@ -18,7 +18,9 @@ type fakeCaller struct {
 		url  string
 		body jobBody
 	}
-	postRes string
+	postRes  string
+	lastURL  string
+	lastBody interface{}
 }
 
 func (f *fakeCaller) GetWithContext(_ context.Context, url string, res interface{}) error {
@@ -28,14 +30,22 @@ func (f *fakeCaller) GetWithContext(_ context.Context, url string, res interface
 	return json.Unmarshal([]byte(f.gets[url]), res)
 }
 
+func (f *fakeCaller) GetUnAuthWithContext(ctx context.Context, url string, res interface{}) error {
+	return f.GetWithContext(ctx, url, res)
+}
+
 func (f *fakeCaller) PostWithContext(_ context.Context, url string, body, res interface{}) error {
 	if f.err != nil {
 		return f.err
 	}
-	f.posts = append(f.posts, struct {
-		url  string
-		body jobBody
-	}{url, body.(jobBody)})
+	if jb, ok := body.(jobBody); ok {
+		f.posts = append(f.posts, struct {
+			url  string
+			body jobBody
+		}{url, jb})
+	} else {
+		f.lastURL, f.lastBody = url, body
+	}
 	return json.Unmarshal([]byte(f.postRes), res)
 }
 
@@ -141,5 +151,32 @@ func TestMockInsufficientCredits(t *testing.T) {
 	res, err := m.Send(context.Background(), SendRequest{Receivers: []string{"+33611111111", "abc"}})
 	if err != nil || len(res.InvalidReceivers) != 1 || m.Info.CreditsLeft != 0 {
 		t.Fatalf("res = %+v, err = %v, credits = %v", res, err, m.Info.CreditsLeft)
+	}
+}
+
+func TestEstimateAndRates(t *testing.T) {
+	f := &fakeCaller{
+		postRes: `{"characters":9,"charactersClass":"7bits","maxCharactersPerPart":160,"parts":1}`,
+		gets: map[string]string{
+			"/sms/rates/destinations?billingCountry=fr&country=us": `{"credit":0.35,"price":{"currencyCode":"EUR","value":0.021}}`,
+			"/sms/rates/packs?billingCountry=fr&country=us":        `[{"creditQuantityMin":500,"smsPrice":{"value":0.02}},{"creditQuantityMin":100,"smsPrice":{"value":0.021}}]`,
+		},
+	}
+	c := newTestClient(f)
+	me, err := c.EstimateMessage(context.Background(), "Bonjour !", false, "alpha")
+	if err != nil || me.Parts != 1 || me.Encoding != "7bits" || me.PerPart != 160 || f.lastURL != "/sms/estimate" {
+		t.Fatalf("me=%+v err=%v url=%s", me, err, f.lastURL)
+	}
+	b := f.lastBody.(map[string]interface{})
+	if b["noStopClause"] != true || b["senderType"] != "alpha" {
+		t.Errorf("body = %v", b)
+	}
+	r, err := c.DestinationRate(context.Background(), "fr", "us")
+	if err != nil || r.CreditsPerSMS != 0.35 || r.Currency != "EUR" {
+		t.Fatalf("rate=%+v err=%v", r, err)
+	}
+	tiers, err := c.PackTiers(context.Background(), "fr", "us")
+	if err != nil || len(tiers) != 2 || tiers[0].CreditsMin != 500 {
+		t.Fatalf("tiers=%+v err=%v", tiers, err)
 	}
 }

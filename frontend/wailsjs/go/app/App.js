@@ -14,8 +14,16 @@ export function Endpoints() {
   return window['go']['app']['App']['Endpoints']();
 }
 
+export function EstimateCost(arg1) {
+  return window['go']['app']['App']['EstimateCost'](arg1);
+}
+
 export function ListAccounts() {
   return window['go']['app']['App']['ListAccounts']();
+}
+
+export function MaxRecipients() {
+  return window['go']['app']['App']['MaxRecipients']();
 }
 
 export function Overview() {

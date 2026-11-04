@@ -110,6 +110,14 @@ func (a *App) Overview() (service.ServiceInfo, error) {
 	return info, wrap(err)
 }
 
+// EstimateCost estime le coût d'un envoi via les endpoints OVH (estimate + tarifs par pays).
+func (a *App) EstimateCost(in service.CostInput) (service.CostEstimate, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	est, err := a.svc.EstimateCost(ctx, in)
+	return est, wrap(err)
+}
+
 func (a *App) Send(in service.SendInput) (service.SendOutcome, error) {
 	ctx, cancel := a.callCtx()
 	defer cancel()
@@ -118,6 +126,9 @@ func (a *App) Send(in service.SendInput) (service.SendOutcome, error) {
 }
 
 // ---- Règles SMS (pures) ----
+
+// MaxRecipients est la limite de destinataires d'un envoi unitaire.
+func (a *App) MaxRecipients() int { return service.MaxOneShotRecipients }
 
 func (a *App) AnalyzeMessage(msg string) sms.Analysis { return sms.Analyze(msg) }
 

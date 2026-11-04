@@ -11,6 +11,7 @@ export type VaultStatus = creds.Status
 export type ServiceInfo = service.ServiceInfo
 export type SendInput = service.SendInput
 export type SendOutcome = service.SendOutcome
+export type CostEstimate = service.CostEstimate
 export type Analysis = sms.Analysis
 export type Receivers = sms.Receivers
 
@@ -57,7 +58,9 @@ export const api = {
   setActive: (id: string) => call(() => Go.SetActiveAccount(id)),
   testConnection: (i: AccountInput) => call(() => Go.TestConnection(i)),
   overview: () => call(Go.Overview),
+  estimateCost: (i: service.CostInput) => call(() => Go.EstimateCost(i)),
   send: (i: SendInput) => call(() => Go.Send(i)),
+  maxRecipients: () => call(Go.MaxRecipients),
   analyze: (m: string) => call(() => Go.AnalyzeMessage(m)),
   parseRecipients: (t: string) => call(() => Go.ParseRecipients(t)),
 }

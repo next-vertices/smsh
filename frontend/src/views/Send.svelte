@@ -1,6 +1,6 @@
 <script lang="ts">
   import Confirm from '../components/Confirm.svelte'
-  import { api, ApiError, type Analysis, type Receivers, type SendOutcome } from '../lib/api'
+  import { api, ApiError, type Analysis, type CostEstimate, type Receivers, type SendOutcome } from '../lib/api'
   import { refreshOverview } from '../lib/actions'
   import { ui } from '../lib/state.svelte'
 
@@ -29,17 +29,58 @@
     api.parseRecipients(t).then((r) => { if (n === seqR) parsed = r }).catch(() => {})
   })
 
+  // Coût : calculé par le backend (POST /sms/estimate + tarifs par pays) quand la saisie est terminée.
+  let cost = $state<CostEstimate | null>(null)
+  let costLoading = $state(false)
+  let costError = $state('')
+  let seqC = 0
+  $effect(() => {
+    const input = {
+      message, recipients, stopClause,
+      senderType: ui.overview?.senders.find((x) => x.name === sender)?.type ?? '',
+    }
+    const n = ++seqC
+    cost = null
+    costError = ''
+    if (!input.message.trim() || !input.recipients.trim()) { costLoading = false; return }
+    costLoading = true
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.estimateCost(input)
+        if (n === seqC) cost = r
+      } catch (e) {
+        if (n === seqC) costError = e instanceof ApiError ? e.message : String(e)
+      } finally {
+        if (n === seqC) costLoading = false
+      }
+    }, 600)
+    return () => clearTimeout(t)
+  })
+
+  let maxRcpt = $state(5)
+  api.maxRecipients().then((n) => (maxRcpt = n)).catch(() => {})
+
+  const eur = (v: number, cur: string) =>
+    new Intl.NumberFormat('fr-FR', { style: 'currency', currency: cur || 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 3 }).format(v)
+
+  function priceText(c: CostEstimate): string {
+    if (!(c.priceMax > 0)) return '—'
+    if (c.priceMin === c.priceMax) return eur(c.priceMax, c.currency)
+    return `${eur(c.priceMin, c.currency)} à ${eur(c.priceMax, c.currency)}`
+  }
+
   const senders = $derived((ui.overview?.senders ?? []).filter((s) => s.status === 'enable'))
   const validCount = $derived(parsed?.valid.length ?? 0)
-  const segments = $derived(analysis?.segments ?? 0)
-  const estimate = $derived(segments * validCount)
+  const segments = $derived(cost?.parts || analysis?.segments || 0)
+  const estimate = $derived(cost?.totalCredits ?? 0)
   const credits = $derived(ui.overview?.creditsLeft)
-  const tooExpensive = $derived(credits !== undefined && estimate > credits)
+  const tooExpensive = $derived(cost !== null && credits !== undefined && estimate > credits)
 
   const problems = $derived.by(() => {
     const p: string[] = []
     if (!message.trim()) p.push('Saisissez un message.')
     if (!validCount) p.push('Ajoutez au moins un destinataire.')
+    if (validCount > maxRcpt) p.push(`Maximum ${maxRcpt} destinataires en envoi unitaire (${validCount} saisis).`)
     if (parsed?.invalid.length) p.push(`Numéro(s) invalide(s) : ${parsed.invalid.join(', ')}`)
     if (scheduled && !sendAt) p.push("Choisissez la date d'envoi différé.")
     return p
@@ -111,9 +152,9 @@
     <label for="rcpt">Destinataire(s)</label>
     <textarea id="rcpt" rows="3" bind:value={recipients} placeholder="06 12 34 56 78&#10;+33 6 98 76 54 32"></textarea>
     <div class="hint">
-      Un numéro par ligne (ou séparés par des virgules). Format national (06…) ou international (+33…).
+      Un numéro par ligne (ou séparés par des virgules), {maxRcpt} maximum. Format national (06…) ou international (+33…).
       {#if parsed && (validCount || parsed.invalid.length)}
-        <strong style="color: var(--text)">{validCount} valide(s)</strong>
+        <strong style="color: {validCount > maxRcpt ? 'var(--danger)' : 'var(--text)'}">{validCount}/{maxRcpt} valide(s)</strong>
         {#if parsed.dupes}· {parsed.dupes} doublon(s) ignoré(s){/if}
         {#if parsed.invalid.length}<span style="color: var(--danger)">· {parsed.invalid.length} invalide(s)</span>{/if}
       {/if}
@@ -157,17 +198,56 @@
     </label>
   </div>
 
+  {#if message.trim() && validCount}
+    <div class="cost" class:pending={costLoading} aria-live="polite">
+      {#if costLoading}
+        <span class="muted">Calcul du coût auprès d'OVH…</span>
+      {:else if costError}
+        <span style="color: var(--danger)">Coût indisponible : {costError}</span>
+      {:else if cost && cost.lines.length}
+        <div class="head">
+          <div>
+            <div class="label">Prix estimé</div>
+            <div class="price">{priceText(cost)}</div>
+            <div class="small muted">HT · tarif public OVH selon le pack acheté</div>
+          </div>
+          <div class="credits">
+            <div class="label">Crédits</div>
+            <div class="big">{cost.totalCredits}</div>
+            {#if credits !== undefined}<div class="small muted">solde : {credits} → {Math.max(credits - cost.totalCredits, 0)}</div>{/if}
+          </div>
+        </div>
+        <div class="small muted detail">
+          {cost.parts} segment(s) · {cost.encoding === 'unicode' ? 'Unicode' : 'GSM-7'} · {cost.recipients} destinataire(s)
+        </div>
+        {#if cost.lines.length > 1 || cost.lines[0].creditsPerSms !== 1}
+          <table class="small">
+            <tbody>
+              {#each cost.lines as l}
+                <tr>
+                  <td class="mono">{l.country.toUpperCase()}</td>
+                  <td>{l.recipients} dest. × {cost.parts} seg. × {l.creditsPerSms} cr.</td>
+                  <td class="num">{l.credits} cr.</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+        {#if cost.unknown.length}
+          <div class="small" style="color: var(--warn)">Pays inconnu, non comptés : {cost.unknown.join(', ')}</div>
+        {/if}
+        {#if cost.warning}<div class="small" style="color: var(--warn)">{cost.warning}</div>{/if}
+      {/if}
+    </div>
+  {/if}
+
   {#if tooExpensive}
     <div class="alert warn">Coût estimé ({estimate}) supérieur à vos crédits ({credits}).</div>
   {/if}
 
   <div class="row between">
-    <div class="muted small">
-      {#if validCount && segments}Estimation : {segments} × {validCount} = <strong style="color: var(--text)">{estimate} crédit(s)</strong>
-        {#if credits !== undefined}· solde {credits}{/if}
-      {:else if problems.length}{problems[0]}{/if}
-    </div>
-    <button class="primary" onclick={ask} disabled={!canSend}>
+    <div class="muted small">{#if problems.length}{problems[0]}{/if}</div>
+    <button class="primary" onclick={ask} disabled={!canSend || costLoading}>
       {scheduled ? 'Programmer' : 'Envoyer'}…
     </button>
   </div>
@@ -178,7 +258,7 @@
     onconfirm={doSend} oncancel={() => (confirming = false)}>
     <p>
       Envoyer ce SMS à <strong>{validCount} destinataire(s)</strong> —
-      {segments} segment(s), environ <strong>{estimate} crédit(s)</strong>
+      {segments} segment(s){#if cost}, environ <strong>{estimate} crédit(s)</strong>{/if}
       {#if scheduled}, le {new Date(sendAt).toLocaleString('fr-FR')}{/if} ?
     </p>
     <blockquote>{message}</blockquote>
@@ -186,6 +266,17 @@
 {/if}
 
 <style>
+  .cost { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+  .cost.pending { opacity: 0.6; }
+  table { margin-top: 6px; border-collapse: collapse; }
+  td { padding: 1px 12px 1px 0; }
+  .num { text-align: right; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+  .price { font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--accent); }
+  .credits { text-align: right; }
+  .big { font-size: 20px; font-weight: 600; line-height: 1.3; }
+  .detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
   .counter { display: flex; gap: 14px; margin-top: 6px; font-size: 12px; color: var(--muted); align-items: center; flex-wrap: wrap; }
   .counter.warn { color: var(--warn); }
   blockquote {
