@@ -23,6 +23,10 @@
 
   let syncing = $state(false)
   let syncResult = $state<SyncResult | null>(null)
+  let days = $state(7)
+  let syncedDays = $state(7)
+  let progress = $state<{ done: number; total: number } | null>(null)
+  let stopRequested = false
 
   let sel = $state<Record<number, boolean>>({})
   let selectedAll = $state(false) // « tout sélectionner » : sélection étendue à tous les résultats
@@ -59,14 +63,29 @@
     } catch { /* facettes facultatives */ }
   }
 
+  // Télécharge par lots (les plus récents d'abord) jusqu'à épuisement, erreur ou arrêt demandé.
   async function sync() {
+    if (syncing) return
     syncing = true
+    stopRequested = false
     error = ''
+    syncResult = null
+    progress = null
+    syncedDays = days
+    let fetched = 0
+    let total = -1
     try {
-      syncResult = await api.syncHistory(30)
+      for (;;) {
+        const r = await api.syncHistory(days)
+        fetched += r.fetched
+        if (total < 0) total = r.fetched + r.remaining
+        progress = { done: Math.min(fetched, total), total }
+        syncResult = { ...r, fetched }
+        await Promise.all([load(true), loadFacets()])
+        if (r.errors.length || r.remaining === 0 || r.fetched === 0 || stopRequested) break
+      }
       ui.historySyncedAt = Date.now()
-      await Promise.all([load(true), loadFacets()])
-    } catch (e) { fail(e) } finally { syncing = false }
+    } catch (e) { fail(e) } finally { syncing = false; progress = null }
   }
 
   // Recherche instantanée (cache local) 300 ms après la dernière saisie.
@@ -147,15 +166,34 @@
 
 <div class="row between" style="margin-bottom: 4px">
   <h1>Historique</h1>
-  <button onclick={sync} disabled={syncing}>{syncing ? 'Synchronisation…' : 'Synchroniser'}</button>
+  <div class="row">
+    <select bind:value={days} disabled={syncing} aria-label="Période à synchroniser" style="width: auto">
+      <option value={7}>7 derniers jours</option>
+      <option value={30}>30 derniers jours</option>
+      <option value={90}>90 derniers jours</option>
+    </select>
+    {#if syncing}
+      <button onclick={() => (stopRequested = true)}>Arrêter</button>
+    {:else}
+      <button onclick={sync}>Synchroniser</button>
+    {/if}
+  </div>
 </div>
 <p class="muted">SMS envoyés depuis ce compte, mis en cache localement. <kbd>/</kbd> pour rechercher.</p>
 
 {#if error}<div class="alert error" role="alert">{error}</div>{/if}
 
-{#if syncResult}
+{#if progress && progress.total > 0}
+  <div class="card" style="padding: 12px 16px">
+    <div class="row between small"><span>Téléchargement des SMS (les plus récents d'abord)…</span>
+      <span><strong>{progress.done}</strong> / {progress.total}</span></div>
+    <div class="pbar"><div class="pfill" style="width: {Math.round((progress.done / progress.total) * 100)}%"></div></div>
+  </div>
+{/if}
+
+{#if syncResult && !syncing}
   <div class="alert" class:ok={!syncResult.errors.length} class:warn={syncResult.errors.length > 0} role="status">
-    <strong>Synchronisation : {syncResult.listed} SMS sur 30 jours, {syncResult.fetched} téléchargé(s){#if syncResult.removed}, {syncResult.removed} supprimé(s) chez OVH{/if}</strong>
+    <strong>Synchronisation : {syncResult.listed} SMS sur {syncedDays} jours, {syncResult.fetched} téléchargé(s){#if syncResult.removed}, {syncResult.removed} supprimé(s) chez OVH{/if}</strong>
     {#if syncResult.remaining > 0}
       Il reste {syncResult.remaining} SMS à télécharger.
       <button class="link" onclick={sync} disabled={syncing}>Continuer</button>
@@ -309,6 +347,8 @@
 {/if}
 
 <style>
+  .pbar { height: 8px; margin-top: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+  .pfill { height: 100%; background: var(--accent); transition: width 0.3s ease; }
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .filters input[type='date'] {
     width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);

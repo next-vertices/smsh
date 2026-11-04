@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"smsh/internal/campaign"
@@ -31,6 +32,7 @@ type Service struct {
 	Store     *store.Store
 	Runner    *campaign.Runner
 
+	syncMu  sync.Mutex
 	rates   rateCache
 	imports importCache
 	batches refreshCache

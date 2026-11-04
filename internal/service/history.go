@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -15,10 +16,10 @@ import (
 
 const (
 	defaultSyncDays   = 30
-	maxFetchPerSync   = 300 // détails récupérés par synchronisation (une requête chacun)
-	refreshRecentDays = 3   // les SMS récents sans accusé sont ré-interrogés
+	maxFetchPerSync   = 1000 // détails récupérés par synchronisation (une requête chacun)
+	refreshRecentDays = 3    // les SMS récents sans accusé sont ré-interrogés
 	refreshMax        = 100
-	apiWorkers        = 4
+	apiWorkers        = 6
 	maxDeleteBatch    = 2000
 	pageSizeMax       = 200
 )
@@ -55,6 +56,10 @@ type SyncResult struct {
 // Au plus 300 détails par appel : si Remaining > 0, relancez pour poursuivre.
 func (s *Service) SyncHistory(ctx context.Context, days int) (SyncResult, error) {
 	res := SyncResult{Errors: []string{}}
+	if !s.syncMu.TryLock() {
+		return res, invalid("Une synchronisation est déjà en cours.")
+	}
+	defer s.syncMu.Unlock()
 	if days <= 0 {
 		days = defaultSyncDays
 	}
@@ -93,14 +98,10 @@ func (s *Service) SyncHistory(ctx context.Context, days int) (SyncResult, error)
 	}
 
 	// À télécharger : les nouveaux, puis les récents sans accusé de réception.
+	// Ordre de téléchargement : d'abord le rafraîchissement des SMS récents sans accusé
+	// (peu nombreux), puis les nouveaux SMS du plus récent au plus ancien.
 	var todo []int64
 	isNew := map[int64]bool{}
-	for _, id := range ids {
-		if !cached[id] {
-			todo = append(todo, id)
-			isNew[id] = true
-		}
-	}
 	recent, err := s.Store.HistoryUndelivered(ctx, acc.ID, s.Now().AddDate(0, 0, -refreshRecentDays), refreshMax)
 	if err != nil {
 		return res, err
@@ -110,6 +111,15 @@ func (s *Service) SyncHistory(ctx context.Context, days int) (SyncResult, error)
 			todo = append(todo, id)
 		}
 	}
+	var fresh []int64
+	for _, id := range ids {
+		if !cached[id] {
+			fresh = append(fresh, id)
+			isNew[id] = true
+		}
+	}
+	sort.Slice(fresh, func(i, j int) bool { return fresh[i] > fresh[j] })
+	todo = append(todo, fresh...)
 	if len(todo) > maxFetchPerSync {
 		todo = todo[:maxFetchPerSync]
 	}
@@ -130,6 +140,33 @@ func (s *Service) SyncHistory(ctx context.Context, days int) (SyncResult, error)
 	return res, nil
 }
 
+// retryDelays : attentes avant de retenter après une erreur transitoire d'OVH (5xx) ou réseau.
+var retryDelays = []time.Duration{500 * time.Millisecond, 1500 * time.Millisecond}
+
+func transient(err error) bool {
+	var oe *ovh.Error
+	if !errors.As(err, &oe) {
+		return false
+	}
+	return oe.Kind == ovh.KindNetwork || oe.Status >= 500
+}
+
+// retry rejoue fn sur erreur transitoire (jamais sur rate limit ni refus d'accès).
+func retry[T any](ctx context.Context, fn func() (T, error)) (T, error) {
+	v, err := fn()
+	for _, d := range retryDelays {
+		if err == nil || !transient(err) || ctx.Err() != nil {
+			break
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(d):
+		}
+		v, err = fn()
+	}
+	return v, err
+}
+
 // minWindow : en dessous, on n'essaie plus de découper la période.
 const minWindow = time.Minute
 
@@ -143,7 +180,9 @@ func listOutgoingWindowed(ctx context.Context, cl ovh.Client, service string, fr
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		ids, err := cl.ListOutgoing(ctx, service, ovh.OutgoingFilter{From: &a, To: &b})
+		ids, err := retry(ctx, func() ([]int64, error) {
+			return cl.ListOutgoing(ctx, service, ovh.OutgoingFilter{From: &a, To: &b})
+		})
 		if err == nil {
 			for _, id := range ids {
 				if !seen[id] {
@@ -187,7 +226,7 @@ func (s *Service) fetchOutgoing(ctx context.Context, cl ovh.Client, acc creds.Ac
 				if skip {
 					continue
 				}
-				o, err := cl.GetOutgoing(ctx, acc.ServiceName, id)
+				o, err := retry(ctx, func() (ovh.Outgoing, error) { return cl.GetOutgoing(ctx, acc.ServiceName, id) })
 				mu.Lock()
 				switch {
 				case err == nil:
@@ -384,7 +423,7 @@ func (s *Service) DeleteHistory(ctx context.Context, ids []int64) (DeleteResult,
 					mu.Unlock()
 					continue
 				}
-				err := cl.DeleteOutgoing(ctx, acc.ServiceName, id)
+				_, err := retry(ctx, func() (struct{}, error) { return struct{}{}, cl.DeleteOutgoing(ctx, acc.ServiceName, id) })
 				mu.Lock()
 				switch {
 				case err == nil || ovh.KindOf(err) == ovh.KindNotFound:

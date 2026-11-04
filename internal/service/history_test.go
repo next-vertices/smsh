@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -200,5 +201,51 @@ func TestSyncSplitsPeriodWhenOVHRefusesLongList(t *testing.T) {
 	}
 	if _, err := s.SyncHistory(ctx, 30); ovh.KindOf(err) != ovh.KindTooManyResults {
 		t.Errorf("erreur attendue (non découpable), obtenu : %v", err)
+	}
+}
+
+type flaky struct {
+	*ovh.Mock
+	mu    sync.Mutex
+	fails int
+	calls int
+}
+
+func (f *flaky) ListOutgoing(ctx context.Context, svc string, fl ovh.OutgoingFilter) ([]int64, error) {
+	f.mu.Lock()
+	f.calls++
+	fail := f.calls <= f.fails
+	f.mu.Unlock()
+	if fail {
+		return nil, &ovh.Error{Kind: ovh.KindUnknown, Status: 500, Message: "Internal server error"}
+	}
+	return f.Mock.ListOutgoing(ctx, svc, fl)
+}
+
+func TestSyncRetriesTransientErrorsAndFetchesNewestFirst(t *testing.T) {
+	old := retryDelays
+	retryDelays = []time.Duration{0, 0}
+	defer func() { retryDelays = old }()
+
+	s, mock := newTestService(t)
+	seedHistory(t, s)
+	fl := &flaky{Mock: mock, fails: 2}
+	s.NewClient = func(ovh.Credentials) (ovh.Client, error) { return fl, nil }
+	res, err := s.SyncHistory(context.Background(), 7)
+	if err != nil || res.Fetched != 3 {
+		t.Fatalf("res = %+v err=%v", res, err)
+	}
+	fl.calls, fl.fails = 0, 99 // plus de tentatives que prévu : l'erreur remonte
+	if _, err := s.SyncHistory(context.Background(), 7); err == nil {
+		t.Error("erreur attendue après épuisement des tentatives")
+	}
+}
+
+func TestOnlyOneSyncAtATime(t *testing.T) {
+	s, _ := newTestService(t)
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
+	if _, err := s.SyncHistory(context.Background(), 7); err == nil {
+		t.Error("une synchronisation concurrente doit être refusée")
 	}
 }
