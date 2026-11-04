@@ -2,6 +2,7 @@ package ovh
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"sync"
 )
@@ -19,6 +20,7 @@ type Mock struct {
 	// CreditsPerReceiver : coût par destinataire valide (1 par défaut).
 	CreditsPerReceiver float64
 	Sent               []SendRequest
+	Batches            map[string]Batch
 	nextID             int64
 }
 
@@ -89,6 +91,76 @@ func (m *Mock) PackTiers(context.Context, string, string) ([]PackTier, error) {
 		return nil, m.Err
 	}
 	return []PackTier{{CreditsMin: 100, PricePerSMS: 0.06}, {CreditsMin: 5000, PricePerSMS: 0.05}}, nil
+}
+
+// ---- batches fictifs : se terminent dès le premier GetBatch ----
+
+func (m *Mock) CreateBatch(_ context.Context, req BatchRequest) (Batch, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return Batch{}, m.Err
+	}
+	cost := float64(len(req.To))
+	if cost > m.Info.CreditsLeft {
+		return Batch{}, &Error{Kind: KindInsufficientCredits, Message: "Crédits SMS insuffisants pour cet envoi.", Status: 400}
+	}
+	m.nextID++
+	b := Batch{ID: fmt.Sprintf("batch-%d", m.nextID), Name: req.Name, Status: "PENDING",
+		TotalRecords: int64(len(req.To)), EstimatedCredits: cost}
+	if m.Batches == nil {
+		m.Batches = map[string]Batch{}
+	}
+	m.Batches[b.ID] = b
+	return b, nil
+}
+
+func (m *Mock) GetBatch(_ context.Context, _, id string) (Batch, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return Batch{}, m.Err
+	}
+	b, ok := m.Batches[id]
+	if !ok {
+		return Batch{}, &Error{Kind: KindNotFound, Message: "Batch introuvable."}
+	}
+	if b.Status == "PENDING" || b.Status == "INSERTING" {
+		b.Status, b.ProcessedRecords = "COMPLETED", b.TotalRecords
+		m.Batches[id] = b
+	}
+	return b, nil
+}
+
+func (m *Mock) BatchStats(_ context.Context, _, id string) (BatchStats, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return BatchStats{}, m.Err
+	}
+	b, ok := m.Batches[id]
+	if !ok {
+		return BatchStats{}, &Error{Kind: KindNotFound, Message: "Batch introuvable."}
+	}
+	st := BatchStats{EstimatedCredits: b.EstimatedCredits}
+	if b.Status == "COMPLETED" {
+		st.Credits, st.Delivered = b.EstimatedCredits, b.TotalRecords
+	} else {
+		st.Pending = b.TotalRecords
+	}
+	return st, nil
+}
+
+func (m *Mock) CancelBatch(_ context.Context, _, id string) (Batch, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	b, ok := m.Batches[id]
+	if !ok {
+		return Batch{}, &Error{Kind: KindNotFound, Message: "Batch introuvable."}
+	}
+	b.Status = "CANCELED"
+	m.Batches[id] = b
+	return b, nil
 }
 
 func (m *Mock) Send(_ context.Context, req SendRequest) (SendResult, error) {

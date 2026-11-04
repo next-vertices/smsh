@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import UnlockModal from './components/UnlockModal.svelte'
   import Onboarding from './views/Onboarding.svelte'
+  import Campaigns from './views/Campaigns.svelte'
   import Placeholder from './views/Placeholder.svelte'
   import Send from './views/Send.svelte'
   import Settings from './views/Settings.svelte'
@@ -80,7 +81,7 @@
       {#if ui.view === 'send'}
         <Send />
       {:else if ui.view === 'campaigns'}
-        <Placeholder title="Campagnes" text="Import CSV, templates, dry-run et envoi avec progression : à venir." />
+        <Campaigns />
       {:else if ui.view === 'history'}
         <Placeholder title="Historique" text="Liste, recherche et suppression des SMS envoyés : à venir." />
       {:else}

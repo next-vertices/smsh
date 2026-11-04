@@ -266,17 +266,6 @@
 {/if}
 
 <style>
-  .cost { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
-  .cost.pending { opacity: 0.6; }
-  table { margin-top: 6px; border-collapse: collapse; }
-  td { padding: 1px 12px 1px 0; }
-  .num { text-align: right; }
-  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-  .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
-  .price { font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--accent); }
-  .credits { text-align: right; }
-  .big { font-size: 20px; font-weight: 600; line-height: 1.3; }
-  .detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
   .counter { display: flex; gap: 14px; margin-top: 6px; font-size: 12px; color: var(--muted); align-items: center; flex-wrap: wrap; }
   .counter.warn { color: var(--warn); }
   blockquote {

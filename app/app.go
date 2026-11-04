@@ -6,12 +6,16 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"smsh/internal/creds"
 	"smsh/internal/ovh"
 	"smsh/internal/service"
 	"smsh/internal/sms"
+	"smsh/internal/store"
 )
 
 const callTimeout = 30 * time.Second
@@ -46,8 +50,12 @@ func New() (*App, error) {
 		if err != nil {
 			return nil, err
 		}
+		st, err := store.Open(filepath.Join(dir, "smsh.db"))
+		if err != nil {
+			return nil, err
+		}
 		mock := ovh.NewMock()
-		svc := service.New(creds.NewManager(dir, creds.NewMemoryVault()))
+		svc := service.New(creds.NewManager(dir, creds.NewMemoryVault()), st)
 		svc.NewClient = func(ovh.Credentials) (ovh.Client, error) { return mock, nil }
 		return &App{svc: svc}, nil
 	}
@@ -55,7 +63,14 @@ func New() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{svc: service.New(creds.Open(dir))}, nil
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, err
+	}
+	st, err := store.Open(filepath.Join(dir, "smsh.db"))
+	if err != nil {
+		return nil, err
+	}
+	return &App{svc: service.New(creds.Open(dir), st)}, nil
 }
 
 // Startup est appelé par Wails au démarrage.
@@ -133,3 +148,87 @@ func (a *App) MaxRecipients() int { return service.MaxOneShotRecipients }
 func (a *App) AnalyzeMessage(msg string) sms.Analysis { return sms.Analyze(msg) }
 
 func (a *App) ParseRecipients(text string) sms.Receivers { return sms.ParseReceivers(text) }
+
+// ---- Campagnes ----
+
+// PickCSV ouvre le sélecteur de fichier natif puis charge le CSV choisi.
+// Renvoie un ImportInfo à ID vide si l'utilisateur annule.
+func (a *App) PickCSV() (service.ImportInfo, error) {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Choisir un fichier CSV de destinataires",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Fichiers CSV (*.csv;*.txt)", Pattern: "*.csv;*.txt"},
+		},
+	})
+	if err != nil || path == "" {
+		return service.ImportInfo{}, wrap(err)
+	}
+	info, err := a.svc.ImportCSV(path)
+	return info, wrap(err)
+}
+
+func (a *App) SimulateCampaign(in service.PlanInput) (service.PlanReport, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	rep, err := a.svc.SimulateCampaign(ctx, in)
+	return rep, wrap(err)
+}
+
+func (a *App) LaunchCampaign(in service.LaunchInput) (store.Campaign, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	c, err := a.svc.LaunchCampaign(ctx, in)
+	return c, wrap(err)
+}
+
+func (a *App) ListCampaigns() ([]store.Campaign, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	cs, err := a.svc.ListCampaigns(ctx)
+	return cs, wrap(err)
+}
+
+func (a *App) GetCampaign(id string) (store.Campaign, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	c, err := a.svc.GetCampaign(ctx, id)
+	return c, wrap(err)
+}
+
+func (a *App) CampaignRecipients(id, status string, offset, limit int) (service.RecipientsPage, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	p, err := a.svc.CampaignRecipients(ctx, id, status, offset, limit)
+	return p, wrap(err)
+}
+
+func (a *App) PauseCampaign(id string) error {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	return wrap(a.svc.PauseCampaign(ctx, id))
+}
+
+func (a *App) ResumeCampaign(id string) error {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	return wrap(a.svc.ResumeCampaign(ctx, id))
+}
+
+func (a *App) CancelCampaign(id string) error {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	return wrap(a.svc.CancelCampaign(ctx, id))
+}
+
+func (a *App) RetryFailed(id string) (int, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	n, err := a.svc.RetryFailed(ctx, id)
+	return n, wrap(err)
+}
+
+func (a *App) DeleteCampaign(id string) error {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	return wrap(a.svc.DeleteCampaign(ctx, id))
+}

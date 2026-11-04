@@ -124,6 +124,62 @@ func (c *client) PackTiers(ctx context.Context, billing, country string) ([]Pack
 	return tiers, nil
 }
 
+type batchBody struct {
+	Name              string   `json:"name"`
+	Message           string   `json:"message"`
+	From              string   `json:"from,omitempty"`
+	SenderForResponse bool     `json:"senderForResponse,omitempty"`
+	To                []string `json:"to"`
+	Deferred          string   `json:"deferred,omitempty"`
+	NoStop            bool     `json:"noStop"`
+	Tag               string   `json:"tag,omitempty"`
+}
+
+func (c *client) CreateBatch(ctx context.Context, req BatchRequest) (Batch, error) {
+	if req.Service == "" || req.Message == "" || len(req.To) == 0 || req.Name == "" {
+		return Batch{}, &Error{Kind: KindInvalidRequest, Message: "Service, nom, message et destinataires sont requis."}
+	}
+	body := batchBody{
+		Name: req.Name, Message: req.Message, From: req.Sender, SenderForResponse: req.Sender == "",
+		To: req.To, NoStop: !req.StopClause, Tag: req.Tag,
+	}
+	if req.SendAt != nil {
+		if req.SendAt.Before(c.now()) {
+			return Batch{}, &Error{Kind: KindInvalidRequest, Message: "La date d'envoi différé est dans le passé."}
+		}
+		body.Deferred = req.SendAt.UTC().Format(time.RFC3339)
+	}
+	var out Batch
+	if err := c.api.PostWithContext(ctx, svcPath(req.Service, "batches"), body, &out); err != nil {
+		return Batch{}, classify(err)
+	}
+	return out, nil
+}
+
+func (c *client) GetBatch(ctx context.Context, service, id string) (Batch, error) {
+	var out Batch
+	if err := c.api.GetWithContext(ctx, svcPath(service, "batches", id), &out); err != nil {
+		return Batch{}, classify(err)
+	}
+	return out, nil
+}
+
+func (c *client) BatchStats(ctx context.Context, service, id string) (BatchStats, error) {
+	var out BatchStats
+	if err := c.api.GetWithContext(ctx, svcPath(service, "batches", id, "statistics"), &out); err != nil {
+		return BatchStats{}, classify(err)
+	}
+	return out, nil
+}
+
+func (c *client) CancelBatch(ctx context.Context, service, id string) (Batch, error) {
+	var out Batch
+	if err := c.api.PostWithContext(ctx, svcPath(service, "batches", id, "cancel"), nil, &out); err != nil {
+		return Batch{}, classify(err)
+	}
+	return out, nil
+}
+
 type jobBody struct {
 	Message           string   `json:"message"`
 	Receivers         []string `json:"receivers"`

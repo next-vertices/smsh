@@ -125,44 +125,75 @@ func (s *Service) EstimateCost(ctx context.Context, in CostInput) (CostEstimate,
 		}
 	}
 
-	byCountry := map[string]int{}
+	agg := map[string]*countryAgg{}
 	for _, n := range rcpt.Valid {
-		if c := sms.CountryOf(n); c != "" {
-			byCountry[c]++
-		} else {
+		c := sms.CountryOf(n)
+		if c == "" {
 			est.Unknown = append(est.Unknown, n)
+			continue
 		}
+		if agg[c] == nil {
+			agg[c] = &countryAgg{}
+		}
+		agg[c].recipients++
+		agg[c].parts += est.Parts
 	}
-	countries := make([]string, 0, len(byCountry))
-	for c := range byCountry {
+	pr, err := s.priceLines(ctx, cl, agg)
+	if err != nil {
+		return est, err
+	}
+	est.Lines, est.Recipients, est.TotalCredits = pr.Lines, pr.Recipients, pr.TotalCredits
+	est.PriceMin, est.PriceMax, est.Currency = pr.PriceMin, pr.PriceMax, pr.Currency
+	return est, nil
+}
+
+// countryAgg cumule, pour un pays, le nombre de destinataires et de segments à envoyer.
+type countryAgg struct {
+	recipients int
+	parts      int // somme des segments de tous les destinataires du pays
+}
+
+// Pricing est le coût agrégé d'un envoi, ventilé par pays.
+type Pricing struct {
+	Lines        []CostLine
+	Recipients   int
+	TotalCredits float64
+	PriceMin     float64
+	PriceMax     float64
+	Currency     string
+}
+
+// priceLines applique les tarifs OVH (par pays) aux segments à envoyer.
+func (s *Service) priceLines(ctx context.Context, cl ovh.Client, agg map[string]*countryAgg) (Pricing, error) {
+	pr := Pricing{Lines: []CostLine{}}
+	countries := make([]string, 0, len(agg))
+	for c := range agg {
 		countries = append(countries, c)
 	}
 	sort.Strings(countries)
-
 	for _, c := range countries {
 		e, err := s.rateFor(ctx, cl, c)
 		if err != nil {
-			return est, err
+			return pr, err
 		}
-		count := float64(byCountry[c])
 		lo, hi := e.tiers[0].PricePerSMS, e.tiers[0].PricePerSMS
 		for _, t := range e.tiers {
 			lo, hi = math.Min(lo, t.PricePerSMS), math.Max(hi, t.PricePerSMS)
 		}
-		units := count * float64(est.Parts)
+		units := float64(agg[c].parts)
 		line := CostLine{
-			Country: c, Recipients: byCountry[c], CreditsPerSMS: e.rate.CreditsPerSMS,
+			Country: c, Recipients: agg[c].recipients, CreditsPerSMS: e.rate.CreditsPerSMS,
 			Credits:  round(units*e.rate.CreditsPerSMS, 3),
 			PriceMin: round(units*lo, 3), PriceMax: round(units*hi, 3),
 		}
-		est.Lines = append(est.Lines, line)
-		est.Recipients += byCountry[c]
-		est.TotalCredits += line.Credits
-		est.PriceMin += line.PriceMin
-		est.PriceMax += line.PriceMax
-		est.Currency = e.rate.Currency
+		pr.Lines = append(pr.Lines, line)
+		pr.Recipients += line.Recipients
+		pr.TotalCredits += line.Credits
+		pr.PriceMin += line.PriceMin
+		pr.PriceMax += line.PriceMax
+		pr.Currency = e.rate.Currency
 	}
-	est.TotalCredits = round(est.TotalCredits, 3)
-	est.PriceMin, est.PriceMax = round(est.PriceMin, 3), round(est.PriceMax, 3)
-	return est, nil
+	pr.TotalCredits = round(pr.TotalCredits, 3)
+	pr.PriceMin, pr.PriceMax = round(pr.PriceMin, 3), round(pr.PriceMax, 3)
+	return pr, nil
 }

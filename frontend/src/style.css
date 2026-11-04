@@ -135,3 +135,16 @@ kbd {
   color: var(--muted);
 }
 .badge.accent { color: var(--accent); border-color: var(--accent); }
+
+/* Encart de coût (Envoyer + Campagnes) */
+.cost { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+.cost.pending { opacity: 0.6; }
+.cost table { margin-top: 6px; border-collapse: collapse; }
+.cost td { padding: 1px 12px 1px 0; }
+.cost .num { text-align: right; }
+.cost .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.cost .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+.cost .price { font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--accent); }
+.cost .credits { text-align: right; }
+.cost .big { font-size: 20px; font-weight: 600; line-height: 1.3; }
+.cost .detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }

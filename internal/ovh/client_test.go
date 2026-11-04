@@ -180,3 +180,40 @@ func TestEstimateAndRates(t *testing.T) {
 		t.Fatalf("tiers=%+v err=%v", tiers, err)
 	}
 }
+
+func TestBatchCalls(t *testing.T) {
+	f := &fakeCaller{
+		postRes: `{"id":"b-1","status":"PENDING","totalRecords":2,"estimatedCredits":2}`,
+		gets: map[string]string{
+			"/sms/sms-ab1/batches/b-1":            `{"id":"b-1","status":"COMPLETED","totalRecords":2,"processedRecords":2}`,
+			"/sms/sms-ab1/batches/b-1/statistics": `{"credits":2,"delivered":1,"failed":1,"pending":0,"sent":0,"stoplisted":0}`,
+		},
+	}
+	c := newTestClient(f)
+	at := c.now().Add(time.Hour)
+	b, err := c.CreateBatch(context.Background(), BatchRequest{
+		Service: "sms-ab1", Name: "Promo", Message: "Salut", To: []string{"+33612345678", "+33698765432"}, SendAt: &at, Tag: "t1",
+	})
+	if err != nil || b.ID != "b-1" || f.lastURL != "/sms/sms-ab1/batches" {
+		t.Fatalf("b=%+v err=%v url=%s", b, err, f.lastURL)
+	}
+	body := f.lastBody.(batchBody)
+	if !body.SenderForResponse || !body.NoStop || body.Deferred != "2026-01-01T13:00:00Z" || len(body.To) != 2 {
+		t.Errorf("body = %+v", body)
+	}
+	got, err := c.GetBatch(context.Background(), "sms-ab1", "b-1")
+	if err != nil || got.Status != "COMPLETED" || got.ProcessedRecords != 2 {
+		t.Fatalf("got=%+v err=%v", got, err)
+	}
+	st, err := c.BatchStats(context.Background(), "sms-ab1", "b-1")
+	if err != nil || st.Delivered != 1 || st.Failed != 1 || st.Credits != 2 {
+		t.Fatalf("st=%+v err=%v", st, err)
+	}
+	if _, err := c.CancelBatch(context.Background(), "sms-ab1", "b-1"); err != nil || f.lastURL != "/sms/sms-ab1/batches/b-1/cancel" {
+		t.Fatalf("cancel err=%v url=%s", err, f.lastURL)
+	}
+	past := c.now().Add(-time.Hour)
+	if _, err := c.CreateBatch(context.Background(), BatchRequest{Service: "s", Name: "n", Message: "m", To: []string{"+33612345678"}, SendAt: &past}); KindOf(err) != KindInvalidRequest {
+		t.Errorf("date passée : %v", err)
+	}
+}

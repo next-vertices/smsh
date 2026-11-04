@@ -8,6 +8,7 @@ import (
 
 	"smsh/internal/creds"
 	"smsh/internal/ovh"
+	"smsh/internal/store"
 )
 
 func newTestService(t *testing.T) (*Service, *ovh.Mock) {
@@ -19,11 +20,14 @@ func newTestService(t *testing.T) (*Service, *ovh.Mock) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Service{
-		Creds:     m,
-		NewClient: func(ovh.Credentials) (ovh.Client, error) { return mock, nil },
-		Now:       time.Now,
-	}, mock
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	svc := New(m, st)
+	svc.NewClient = func(ovh.Credentials) (ovh.Client, error) { return mock, nil }
+	return svc, mock
 }
 
 func TestSend(t *testing.T) {

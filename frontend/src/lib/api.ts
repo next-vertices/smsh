@@ -1,7 +1,7 @@
 // Fine couche au-dessus des bindings Wails : décode les erreurs structurées
 // et gère le déverrouillage du coffre. Aucune logique métier ici.
 import * as Go from '../../wailsjs/go/app/App'
-import type { creds, service, sms } from '../../wailsjs/go/models'
+import type { creds, service, sms, store } from '../../wailsjs/go/models'
 import { requestUnlock } from './state.svelte'
 
 export type Account = creds.Account
@@ -12,6 +12,13 @@ export type ServiceInfo = service.ServiceInfo
 export type SendInput = service.SendInput
 export type SendOutcome = service.SendOutcome
 export type CostEstimate = service.CostEstimate
+export type Campaign = store.Campaign
+export type CampaignRecipient = store.Recipient
+export type ImportInfo = service.ImportInfo
+export type PlanInput = service.PlanInput
+export type PlanReport = service.PlanReport
+export type LaunchInput = service.LaunchInput
+export type RecipientsPage = service.RecipientsPage
 export type Analysis = sms.Analysis
 export type Receivers = sms.Receivers
 
@@ -61,6 +68,18 @@ export const api = {
   estimateCost: (i: service.CostInput) => call(() => Go.EstimateCost(i)),
   send: (i: SendInput) => call(() => Go.Send(i)),
   maxRecipients: () => call(Go.MaxRecipients),
+  pickCsv: () => call(Go.PickCSV),
+  simulate: (i: PlanInput) => call(() => Go.SimulateCampaign(i)),
+  launch: (i: LaunchInput) => call(() => Go.LaunchCampaign(i)),
+  campaigns: () => call(Go.ListCampaigns),
+  campaign: (id: string) => call(() => Go.GetCampaign(id)),
+  campaignRecipients: (id: string, status: string, offset: number, limit: number) =>
+    call(() => Go.CampaignRecipients(id, status, offset, limit)),
+  pauseCampaign: (id: string) => call(() => Go.PauseCampaign(id)),
+  resumeCampaign: (id: string) => call(() => Go.ResumeCampaign(id)),
+  cancelCampaign: (id: string) => call(() => Go.CancelCampaign(id)),
+  retryFailed: (id: string) => call(() => Go.RetryFailed(id)),
+  deleteCampaign: (id: string) => call(() => Go.DeleteCampaign(id)),
   analyze: (m: string) => call(() => Go.AnalyzeMessage(m)),
   parseRecipients: (t: string) => call(() => Go.ParseRecipients(t)),
 }

@@ -73,12 +73,58 @@ type PackTier struct {
 	PricePerSMS float64 `json:"pricePerSms"`
 }
 
+// BatchRequest crée une campagne native OVH (POST /sms/{serviceName}/batches).
+// Le même message est envoyé à tous les destinataires.
+type BatchRequest struct {
+	Service    string
+	Name       string
+	Message    string
+	Sender     string // vide : expéditeur par défaut (senderForResponse)
+	To         []string
+	SendAt     *time.Time
+	StopClause bool
+	Tag        string
+}
+
+// BatchError est une erreur d'un destinataire dans un batch.
+type BatchError struct {
+	Receiver string `json:"receiver"`
+	Message  string `json:"message"`
+}
+
+// Batch est l'état d'une campagne OVH.
+type Batch struct {
+	ID               string       `json:"id"`
+	Name             string       `json:"name"`
+	Status           string       `json:"status"` // PENDING, INSERTING, INSERTED, COMPLETED, FAILED, TO_CANCEL, CANCELING, CANCELED
+	TotalRecords     int64        `json:"totalRecords"`
+	ProcessedRecords int64        `json:"processedRecords"`
+	EstimatedCredits float64      `json:"estimatedCredits"`
+	Errors           []BatchError `json:"errors"`
+}
+
+// BatchStats est la ventilation des SMS d'un batch.
+type BatchStats struct {
+	Credits          float64 `json:"credits"`
+	EstimatedCredits float64 `json:"estimatedCredits"`
+	Delivered        int64   `json:"delivered"`
+	Failed           int64   `json:"failed"`
+	Pending          int64   `json:"pending"`
+	Sent             int64   `json:"sent"`
+	Stoplisted       int64   `json:"stoplisted"`
+}
+
 // Client est l'accès à l'API SMS d'OVH.
 type Client interface {
 	ListServices(ctx context.Context) ([]string, error)
 	Account(ctx context.Context, service string) (AccountInfo, error)
 	Senders(ctx context.Context, service string) ([]Sender, error)
 	Send(ctx context.Context, req SendRequest) (SendResult, error)
+	// Campagnes natives OVH (batches).
+	CreateBatch(ctx context.Context, req BatchRequest) (Batch, error)
+	GetBatch(ctx context.Context, service, id string) (Batch, error)
+	BatchStats(ctx context.Context, service, id string) (BatchStats, error)
+	CancelBatch(ctx context.Context, service, id string) (Batch, error)
 	// EstimateMessage fait analyser le message par OVH (encodage, segments).
 	EstimateMessage(ctx context.Context, message string, stopClause bool, senderType string) (MessageEstimate, error)
 	// DestinationRate donne le tarif d'un SMS vers un pays (code ISO minuscule).

@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"smsh/internal/campaign"
 	"smsh/internal/creds"
 	"smsh/internal/ovh"
 	"smsh/internal/sms"
+	"smsh/internal/store"
 )
 
 // MaxOneShotRecipients est le nombre maximal de destinataires d'un envoi unitaire
@@ -26,13 +28,21 @@ type Service struct {
 	Creds     *creds.Manager
 	NewClient ClientFactory
 	Now       func() time.Time
+	Store     *store.Store
+	Runner    *campaign.Runner
 
-	rates rateCache
+	rates   rateCache
+	imports importCache
+	batches refreshCache
 }
 
-// New crée un Service branché sur la vraie API OVH.
-func New(m *creds.Manager) *Service {
-	return &Service{Creds: m, NewClient: ovh.New, Now: time.Now}
+// New crée un Service branché sur la vraie API OVH. Les campagnes interrompues
+// par une fermeture de l'application sont remises en pause.
+func New(m *creds.Manager, st *store.Store) *Service {
+	s := &Service{Creds: m, NewClient: ovh.New, Now: time.Now, Store: st}
+	s.Runner = campaign.NewRunner(st, s.sendCampaignMessage)
+	_ = st.ResetInterrupted(context.Background())
+	return s
 }
 
 func toOVH(a creds.Account, s creds.Secrets) ovh.Credentials {
@@ -193,6 +203,8 @@ func Describe(err error) Problem {
 		return Problem{"bad_passphrase", "Passphrase incorrecte."}
 	case errors.Is(err, creds.ErrWeakPassphase):
 		return Problem{"validation", err.Error()}
+	case errors.Is(err, store.ErrNotFound):
+		return Problem{"not_found", "Campagne introuvable."}
 	case errors.Is(err, creds.ErrNoAccount):
 		return Problem{"no_account", "Aucun compte OVH configuré."}
 	case errors.As(err, &ve):

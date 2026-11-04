@@ -1,3 +1,22 @@
+export namespace campaign {
+	
+	export class RowIssue {
+	    line: number;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RowIssue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.line = source["line"];
+	        this.value = source["value"];
+	    }
+	}
+
+}
+
 export namespace creds {
 	
 	export class Account {
@@ -205,6 +224,197 @@ export namespace service {
 	    }
 	}
 	
+	export class ImportInfo {
+	    id: string;
+	    file: string;
+	    headers: string[];
+	    rows: number;
+	    sample: string[][];
+	    phoneColumn: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.file = source["file"];
+	        this.headers = source["headers"];
+	        this.rows = source["rows"];
+	        this.sample = source["sample"];
+	        this.phoneColumn = source["phoneColumn"];
+	    }
+	}
+	export class LaunchInput {
+	    importId: string;
+	    phoneColumn: number;
+	    template: string;
+	    mode: string;
+	    stopClause: boolean;
+	    senderType: string;
+	    rate: number;
+	    name: string;
+	    sender: string;
+	    sendAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LaunchInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.importId = source["importId"];
+	        this.phoneColumn = source["phoneColumn"];
+	        this.template = source["template"];
+	        this.mode = source["mode"];
+	        this.stopClause = source["stopClause"];
+	        this.senderType = source["senderType"];
+	        this.rate = source["rate"];
+	        this.name = source["name"];
+	        this.sender = source["sender"];
+	        this.sendAt = source["sendAt"];
+	    }
+	}
+	export class PlanInput {
+	    importId: string;
+	    phoneColumn: number;
+	    template: string;
+	    mode: string;
+	    stopClause: boolean;
+	    senderType: string;
+	    rate: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PlanInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.importId = source["importId"];
+	        this.phoneColumn = source["phoneColumn"];
+	        this.template = source["template"];
+	        this.mode = source["mode"];
+	        this.stopClause = source["stopClause"];
+	        this.senderType = source["senderType"];
+	        this.rate = source["rate"];
+	    }
+	}
+	export class PlanSample {
+	    phone: string;
+	    message: string;
+	    parts: number;
+	    encoding: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PlanSample(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.phone = source["phone"];
+	        this.message = source["message"];
+	        this.parts = source["parts"];
+	        this.encoding = source["encoding"];
+	    }
+	}
+	export class PlanReport {
+	    mode: string;
+	    recipients: number;
+	    invalidCount: number;
+	    invalid: campaign.RowIssue[];
+	    dupes: number;
+	    variables: string[];
+	    samples: PlanSample[];
+	    totalParts: number;
+	    maxParts: number;
+	    lines: CostLine[];
+	    totalCredits: number;
+	    priceMin: number;
+	    priceMax: number;
+	    currency: string;
+	    unknownCountry: number;
+	    durationSeconds: number;
+	    blocking: string[];
+	    warnings: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PlanReport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.recipients = source["recipients"];
+	        this.invalidCount = source["invalidCount"];
+	        this.invalid = this.convertValues(source["invalid"], campaign.RowIssue);
+	        this.dupes = source["dupes"];
+	        this.variables = source["variables"];
+	        this.samples = this.convertValues(source["samples"], PlanSample);
+	        this.totalParts = source["totalParts"];
+	        this.maxParts = source["maxParts"];
+	        this.lines = this.convertValues(source["lines"], CostLine);
+	        this.totalCredits = source["totalCredits"];
+	        this.priceMin = source["priceMin"];
+	        this.priceMax = source["priceMax"];
+	        this.currency = source["currency"];
+	        this.unknownCountry = source["unknownCountry"];
+	        this.durationSeconds = source["durationSeconds"];
+	        this.blocking = source["blocking"];
+	        this.warnings = source["warnings"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class RecipientsPage {
+	    items: store.Recipient[];
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RecipientsPage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.items = this.convertValues(source["items"], store.Recipient);
+	        this.total = source["total"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SendInput {
 	    message: string;
 	    recipients: string;
@@ -344,6 +554,104 @@ export namespace sms {
 	        this.valid = source["valid"];
 	        this.invalid = source["invalid"];
 	        this.dupes = source["dupes"];
+	    }
+	}
+
+}
+
+export namespace store {
+	
+	export class Campaign {
+	    id: string;
+	    name: string;
+	    mode: string;
+	    accountId: string;
+	    template: string;
+	    sender: string;
+	    stopClause: boolean;
+	    // Go type: time
+	    sendAt?: any;
+	    rate: number;
+	    status: string;
+	    batchId: string;
+	    total: number;
+	    sent: number;
+	    failed: number;
+	    credits: number;
+	    error: string;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new Campaign(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.mode = source["mode"];
+	        this.accountId = source["accountId"];
+	        this.template = source["template"];
+	        this.sender = source["sender"];
+	        this.stopClause = source["stopClause"];
+	        this.sendAt = this.convertValues(source["sendAt"], null);
+	        this.rate = source["rate"];
+	        this.status = source["status"];
+	        this.batchId = source["batchId"];
+	        this.total = source["total"];
+	        this.sent = source["sent"];
+	        this.failed = source["failed"];
+	        this.credits = source["credits"];
+	        this.error = source["error"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Recipient {
+	    idx: number;
+	    phone: string;
+	    vars: Record<string, string>;
+	    message: string;
+	    status: string;
+	    error: string;
+	    ovhId: number;
+	    credits: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Recipient(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.idx = source["idx"];
+	        this.phone = source["phone"];
+	        this.vars = source["vars"];
+	        this.message = source["message"];
+	        this.status = source["status"];
+	        this.error = source["error"];
+	        this.ovhId = source["ovhId"];
+	        this.credits = source["credits"];
 	    }
 	}
 

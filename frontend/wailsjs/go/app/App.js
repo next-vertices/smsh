@@ -6,8 +6,20 @@ export function AnalyzeMessage(arg1) {
   return window['go']['app']['App']['AnalyzeMessage'](arg1);
 }
 
+export function CampaignRecipients(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['CampaignRecipients'](arg1, arg2, arg3, arg4);
+}
+
+export function CancelCampaign(arg1) {
+  return window['go']['app']['App']['CancelCampaign'](arg1);
+}
+
 export function DeleteAccount(arg1) {
   return window['go']['app']['App']['DeleteAccount'](arg1);
+}
+
+export function DeleteCampaign(arg1) {
+  return window['go']['app']['App']['DeleteCampaign'](arg1);
 }
 
 export function Endpoints() {
@@ -18,8 +30,20 @@ export function EstimateCost(arg1) {
   return window['go']['app']['App']['EstimateCost'](arg1);
 }
 
+export function GetCampaign(arg1) {
+  return window['go']['app']['App']['GetCampaign'](arg1);
+}
+
+export function LaunchCampaign(arg1) {
+  return window['go']['app']['App']['LaunchCampaign'](arg1);
+}
+
 export function ListAccounts() {
   return window['go']['app']['App']['ListAccounts']();
+}
+
+export function ListCampaigns() {
+  return window['go']['app']['App']['ListCampaigns']();
 }
 
 export function MaxRecipients() {
@@ -34,6 +58,22 @@ export function ParseRecipients(arg1) {
   return window['go']['app']['App']['ParseRecipients'](arg1);
 }
 
+export function PauseCampaign(arg1) {
+  return window['go']['app']['App']['PauseCampaign'](arg1);
+}
+
+export function PickCSV() {
+  return window['go']['app']['App']['PickCSV']();
+}
+
+export function ResumeCampaign(arg1) {
+  return window['go']['app']['App']['ResumeCampaign'](arg1);
+}
+
+export function RetryFailed(arg1) {
+  return window['go']['app']['App']['RetryFailed'](arg1);
+}
+
 export function SaveAccount(arg1) {
   return window['go']['app']['App']['SaveAccount'](arg1);
 }
@@ -44,6 +84,10 @@ export function Send(arg1) {
 
 export function SetActiveAccount(arg1) {
   return window['go']['app']['App']['SetActiveAccount'](arg1);
+}
+
+export function SimulateCampaign(arg1) {
+  return window['go']['app']['App']['SimulateCampaign'](arg1);
 }
 
 export function Status() {
