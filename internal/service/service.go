@@ -51,11 +51,10 @@ func (s *Service) info(ctx context.Context, name string, a creds.Account, sec cr
 	if err != nil {
 		return ServiceInfo{}, err
 	}
+	// La liste des expéditeurs est facultative : un token restreint peut ne pas
+	// avoir le droit GET /sms/{service}/senders, sans empêcher d'envoyer.
 	senders, err := cl.Senders(ctx, a.ServiceName)
-	if err != nil {
-		return ServiceInfo{}, err
-	}
-	if senders == nil {
+	if err != nil || senders == nil {
 		senders = []ovh.Sender{}
 	}
 	return ServiceInfo{Account: name, ServiceName: a.ServiceName, Status: acc.Status, CreditsLeft: acc.CreditsLeft, Senders: senders}, nil
@@ -68,7 +67,15 @@ func (s *Service) TestConnection(ctx context.Context, in creds.Input) (ServiceIn
 	if err != nil {
 		return ServiceInfo{}, err
 	}
-	return s.info(ctx, a.Name, a, sec)
+	info, err := s.info(ctx, a.Name, a, sec)
+	var oe *ovh.Error
+	if errors.As(err, &oe) && oe.Kind == ovh.KindCredentials {
+		// Diagnostic sans fuite : seules les longueurs sont affichées.
+		return info, &ovh.Error{Kind: oe.Kind, Status: oe.Status, Err: oe.Err,
+			Message: fmt.Sprintf("%s [longueurs reçues : application key=%d, secret=%d, consumer key=%d ; attendu 16/32/32]",
+				oe.Message, len(sec.AppKey), len(sec.AppSecret), len(sec.ConsumerKey))}
+	}
+	return info, err
 }
 
 // Overview renvoie crédits et expéditeurs du compte actif.

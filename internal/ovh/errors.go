@@ -83,6 +83,7 @@ func classifyAPI(api *goovh.APIError) *Error {
 		if strings.Contains(msg, "expired") {
 			e.Message = "Le consumer key a expiré : générez-en un nouveau."
 		}
+		e.Message += " Détail OVH (" + http.StatusText(api.Code) + ") : " + api.Message
 	case api.Code == http.StatusNotFound:
 		e.Kind, e.Message = KindNotFound, "Service SMS introuvable : vérifiez le serviceName."
 	case strings.Contains(msg, "credit"):
