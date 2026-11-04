@@ -52,6 +52,8 @@
     box-shadow: var(--shadow);
     padding: 20px;
     outline: none;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
   }
   .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 </style>

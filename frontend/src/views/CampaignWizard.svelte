@@ -292,7 +292,7 @@
   .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
   .chip { padding: 1px 9px; font-size: 12px; font-family: Consolas, monospace; border-radius: 999px; }
   .tablewrap { overflow-x: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; }
-  table.data { border-collapse: collapse; width: 100%; font-size: 12px; }
+  table.data { border-collapse: collapse; width: 100%; min-width: 360px; font-size: 12px; }
   table.data th, table.data td { text-align: left; padding: 4px 10px; white-space: nowrap; border-bottom: 1px solid var(--border); }
   table.data th { background: var(--surface-2); font-weight: 600; }
   table.data tr:last-child td { border-bottom: none; }
@@ -301,9 +301,4 @@
     margin: 0; padding: 8px 12px; border-left: 3px solid var(--accent);
     background: var(--surface-2); border-radius: 4px; white-space: pre-wrap;
   }
-  input[type='number'] {
-    width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-    border-radius: 8px; padding: 8px 10px; font: inherit; outline: none;
-  }
-  input[type='number']:disabled { opacity: 0.5; }
 </style>

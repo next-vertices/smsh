@@ -82,6 +82,10 @@
   .item:last-child { border-bottom: none; }
   .item:hover:not(:disabled) { background: var(--surface-2); }
   .prog { width: 160px; flex-shrink: 0; }
+  @media (max-width: 640px) {
+    .item { flex-wrap: wrap; gap: 8px 12px; }
+    .prog { order: 3; width: 100%; }
+  }
   .bar { height: 6px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; margin-bottom: 2px; }
   .fill { height: 100%; background: var(--accent); }
   .fill.bad { background: var(--danger); }

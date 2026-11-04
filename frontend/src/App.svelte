@@ -64,7 +64,7 @@
       <div class="grow"></div>
       {#if active}
         <div class="acct">
-          <div class="small muted">Compte actif</div>
+          <div class="small muted lbl">Compte actif</div>
           <strong>{active.name}</strong>
           {#if ui.overview}
             <div class="small">{ui.overview.creditsLeft} crédit(s)</div>
@@ -113,5 +113,25 @@
   .acct { border-top: 1px solid var(--border); padding: 12px 10px 0; }
   .err { color: var(--danger); }
   main { flex: 1; overflow-y: auto; padding: 28px 32px; }
-  main > :global(*) { max-width: 760px; }
+  main > :global(*) { max-width: 920px; }
+
+  /* Fenêtre étroite : barre latérale réduite */
+  @media (max-width: 900px) {
+    nav { width: 168px; }
+    .item kbd { display: none; }
+    main { padding: 22px 20px; }
+  }
+  /* Très étroit : la navigation passe en barre horizontale en haut */
+  @media (max-width: 700px) {
+    .shell { flex-direction: column; }
+    nav {
+      width: auto; flex-direction: row; align-items: center; gap: 2px; overflow-x: auto;
+      padding: 8px 10px; border-right: none; border-bottom: 1px solid var(--border);
+    }
+    .brand { padding: 4px 10px 4px 4px; }
+    .item { width: auto; white-space: nowrap; }
+    .acct { border-top: none; padding: 0 6px; white-space: nowrap; }
+    .acct .lbl { display: none; }
+    main { padding: 16px 14px; }
+  }
 </style>

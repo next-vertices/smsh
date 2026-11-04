@@ -22,4 +22,5 @@
 
 <style>
   .wrap { max-width: 640px; margin: 0 auto; padding: 40px 24px; }
+  @media (max-width: 640px) { .wrap { padding: 14px 10px; } }
 </style>

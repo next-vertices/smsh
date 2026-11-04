@@ -349,13 +349,8 @@
 <style>
   .pbar { height: 8px; margin-top: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
   .pfill { height: 100%; background: var(--accent); transition: width 0.3s ease; }
-  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .filters input[type='date'] {
-    width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-    border-radius: 8px; padding: 7px 10px; font: inherit; outline: none;
-  }
   .tablewrap { overflow-x: auto; }
-  table.hist { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  table.hist { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 12.5px; }
   .hist th, .hist td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
   .hist th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
   .hist tbody tr { cursor: pointer; }
@@ -372,6 +367,7 @@
   .st.delivered { color: var(--ok); border-color: var(--ok); }
   .st.scheduled { color: var(--warn); border-color: var(--warn); }
   dl { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; margin: 0 0 12px; }
+  @media (max-width: 480px) { dl { grid-template-columns: 1fr; gap: 0; } dd { margin-bottom: 8px; } }
   dt { color: var(--muted); }
   dd { margin: 0; }
   blockquote {

@@ -24,8 +24,8 @@ func main() {
 		Title:     "Smsh",
 		Width:     1100,
 		Height:    760,
-		MinWidth:  820,
-		MinHeight: 560,
+		MinWidth:  480,
+		MinHeight: 480,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

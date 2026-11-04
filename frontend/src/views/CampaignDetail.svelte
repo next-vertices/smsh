@@ -189,12 +189,13 @@
   .bar { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
   .fill { height: 100%; background: var(--accent); transition: width 0.4s ease; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+  @media (max-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } }
   .n { font-size: 22px; font-weight: 700; line-height: 1.2; }
   .n.ok { color: var(--ok); }
   .n.bad { color: var(--danger); }
   .label2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
   .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; max-height: 420px; overflow-y: auto; }
-  table.data { border-collapse: collapse; width: 100%; font-size: 12px; }
+  table.data { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 12px; }
   table.data th, table.data td { text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--border); }
   table.data th { background: var(--surface-2); position: sticky; top: 0; }
   .msg { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
