@@ -20,6 +20,7 @@ const (
 	KindInvalidReceiver     Kind = "invalid_receiver"
 	KindInvalidRequest      Kind = "invalid_request"
 	KindNotFound            Kind = "not_found"
+	KindTooManyResults      Kind = "too_many_results" // liste trop longue : restreindre le filtre
 	KindNetwork             Kind = "network"
 	KindUnknown             Kind = "unknown"
 )
@@ -84,6 +85,8 @@ func classifyAPI(api *goovh.APIError) *Error {
 			e.Message = "Le consumer key a expiré : générez-en un nouveau."
 		}
 		e.Message += " Détail OVH (" + http.StatusText(api.Code) + ") : " + api.Message
+	case strings.Contains(msg, "narrow your query"):
+		e.Kind, e.Message = KindTooManyResults, "Trop de résultats : OVH demande de restreindre la période."
 	case api.Code == http.StatusNotFound:
 		e.Kind, e.Message = KindNotFound, "Service SMS introuvable : vérifiez le serviceName."
 	case strings.Contains(msg, "credit"):

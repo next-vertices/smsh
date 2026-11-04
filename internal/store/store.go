@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS recipients (
 	PRIMARY KEY (campaign_id, idx)
 );
 CREATE INDEX IF NOT EXISTS recipients_status ON recipients(campaign_id, status, idx);
+` + historySchema + `
 `
 
 // Open ouvre (et migre) la base. path ":memory:" pour les tests.

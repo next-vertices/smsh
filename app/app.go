@@ -76,12 +76,15 @@ func New() (*App, error) {
 // Startup est appelé par Wails au démarrage.
 func (a *App) Startup(ctx context.Context) { a.ctx = ctx }
 
-func (a *App) callCtx() (context.Context, context.CancelFunc) {
-	base := a.ctx
-	if base == nil {
-		base = context.Background()
+func (a *App) callBase() context.Context {
+	if a.ctx == nil {
+		return context.Background()
 	}
-	return context.WithTimeout(base, callTimeout)
+	return a.ctx
+}
+
+func (a *App) callCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(a.callBase(), callTimeout)
 }
 
 // ---- Stockage & comptes ----
@@ -231,4 +234,50 @@ func (a *App) DeleteCampaign(id string) error {
 	ctx, cancel := a.callCtx()
 	defer cancel()
 	return wrap(a.svc.DeleteCampaign(ctx, id))
+}
+
+// ---- Historique ----
+
+func (a *App) SyncHistory(days int) (service.SyncResult, error) {
+	ctx, cancel := context.WithTimeout(a.callBase(), 5*time.Minute)
+	defer cancel()
+	r, err := a.svc.SyncHistory(ctx, days)
+	return r, wrap(err)
+}
+
+func (a *App) SearchHistory(q service.HistoryQuery, offset, limit int) (store.HistoryPage, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	p, err := a.svc.SearchHistory(ctx, q, offset, limit)
+	return p, wrap(err)
+}
+
+func (a *App) HistoryMatchingIDs(q service.HistoryQuery) ([]int64, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	ids, err := a.svc.HistoryMatchingIDs(ctx, q)
+	return ids, wrap(err)
+}
+
+func (a *App) HistoryFacets() (service.HistoryFacets, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	f, err := a.svc.HistoryFacets(ctx)
+	return f, wrap(err)
+}
+
+func (a *App) HistoryDetail(id int64) (store.HistoryItem, error) {
+	ctx, cancel := a.callCtx()
+	defer cancel()
+	h, err := a.svc.HistoryDetail(ctx, id)
+	return h, wrap(err)
+}
+
+// DeleteHistory supprime des SMS chez OVH et du cache local.
+func (a *App) DeleteHistory(ids []int64) (service.DeleteResult, error) {
+	// Les suppressions en lot peuvent dépasser le délai d'un appel unitaire.
+	ctx, cancel := context.WithTimeout(a.callBase(), 5*time.Minute)
+	defer cancel()
+	r, err := a.svc.DeleteHistory(ctx, ids)
+	return r, wrap(err)
 }

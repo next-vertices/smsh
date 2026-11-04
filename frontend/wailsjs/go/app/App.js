@@ -22,6 +22,10 @@ export function DeleteCampaign(arg1) {
   return window['go']['app']['App']['DeleteCampaign'](arg1);
 }
 
+export function DeleteHistory(arg1) {
+  return window['go']['app']['App']['DeleteHistory'](arg1);
+}
+
 export function Endpoints() {
   return window['go']['app']['App']['Endpoints']();
 }
@@ -32,6 +36,18 @@ export function EstimateCost(arg1) {
 
 export function GetCampaign(arg1) {
   return window['go']['app']['App']['GetCampaign'](arg1);
+}
+
+export function HistoryDetail(arg1) {
+  return window['go']['app']['App']['HistoryDetail'](arg1);
+}
+
+export function HistoryFacets() {
+  return window['go']['app']['App']['HistoryFacets']();
+}
+
+export function HistoryMatchingIDs(arg1) {
+  return window['go']['app']['App']['HistoryMatchingIDs'](arg1);
 }
 
 export function LaunchCampaign(arg1) {
@@ -78,6 +94,10 @@ export function SaveAccount(arg1) {
   return window['go']['app']['App']['SaveAccount'](arg1);
 }
 
+export function SearchHistory(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SearchHistory'](arg1, arg2, arg3);
+}
+
 export function Send(arg1) {
   return window['go']['app']['App']['Send'](arg1);
 }
@@ -92,6 +112,10 @@ export function SimulateCampaign(arg1) {
 
 export function Status() {
   return window['go']['app']['App']['Status']();
+}
+
+export function SyncHistory(arg1) {
+  return window['go']['app']['App']['SyncHistory'](arg1);
 }
 
 export function TestConnection(arg1) {

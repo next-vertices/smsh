@@ -20,6 +20,7 @@ export const ui = $state({
   accounts: [] as AccountView[],
   overview: null as ServiceInfo | null,
   overviewError: '',
+  historySyncedAt: 0,
   unlock: null as null | { initialized: boolean; resolve: () => void; reject: () => void },
 })
 

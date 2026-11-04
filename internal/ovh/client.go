@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/url"
 	"slices"
+	"strconv"
 	"time"
 
 	goovh "github.com/ovh/go-ovh/ovh"
@@ -13,6 +14,7 @@ import (
 // caller est la partie de *goovh.Client utilisée ici (remplaçable en test).
 type caller interface {
 	GetWithContext(ctx context.Context, url string, res interface{}) error
+	DeleteWithContext(ctx context.Context, url string, res interface{}) error
 	GetUnAuthWithContext(ctx context.Context, url string, res interface{}) error
 	PostWithContext(ctx context.Context, url string, body, res interface{}) error
 }
@@ -124,6 +126,42 @@ func (c *client) PackTiers(ctx context.Context, billing, country string) ([]Pack
 	return tiers, nil
 }
 
+func (c *client) ListOutgoing(ctx context.Context, service string, f OutgoingFilter) ([]int64, error) {
+	q := url.Values{}
+	if f.From != nil {
+		q.Set("creationDatetime.from", f.From.UTC().Format(time.RFC3339))
+	}
+	if f.To != nil {
+		q.Set("creationDatetime.to", f.To.UTC().Format(time.RFC3339))
+	}
+	for k, v := range map[string]string{"receiver": f.Receiver, "sender": f.Sender, "tag": f.Tag, "batchID": f.BatchID} {
+		if v != "" {
+			q.Set(k, v)
+		}
+	}
+	path := svcPath(service, "outgoing")
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	var ids []int64
+	if err := c.api.GetWithContext(ctx, path, &ids); err != nil {
+		return nil, classify(err)
+	}
+	return ids, nil
+}
+
+func (c *client) GetOutgoing(ctx context.Context, service string, id int64) (Outgoing, error) {
+	var out Outgoing
+	if err := c.api.GetWithContext(ctx, svcPath(service, "outgoing", strconv.FormatInt(id, 10)), &out); err != nil {
+		return Outgoing{}, classify(err)
+	}
+	return out, nil
+}
+
+func (c *client) DeleteOutgoing(ctx context.Context, service string, id int64) error {
+	return classify(c.api.DeleteWithContext(ctx, svcPath(service, "outgoing", strconv.FormatInt(id, 10)), nil))
+}
+
 type batchBody struct {
 	Name              string   `json:"name"`
 	Message           string   `json:"message"`
@@ -188,6 +226,7 @@ type jobBody struct {
 	NoStopClause      bool     `json:"noStopClause"`
 	Coding            string   `json:"coding"`
 	DifferedPeriod    int      `json:"differedPeriod,omitempty"`
+	Tag               string   `json:"tag,omitempty"`
 }
 
 func (c *client) Send(ctx context.Context, req SendRequest) (SendResult, error) {
@@ -201,6 +240,7 @@ func (c *client) Send(ctx context.Context, req SendRequest) (SendResult, error) 
 		SenderForResponse: req.Sender == "",
 		NoStopClause:      !req.StopClause,
 		Coding:            "7bit",
+		Tag:               req.Tag,
 	}
 	if req.Unicode {
 		body.Coding = "8bit"

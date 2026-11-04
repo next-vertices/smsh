@@ -19,13 +19,19 @@ export type PlanInput = service.PlanInput
 export type PlanReport = service.PlanReport
 export type LaunchInput = service.LaunchInput
 export type RecipientsPage = service.RecipientsPage
+export type HistoryItem = store.HistoryItem
+export type HistoryPage = store.HistoryPage
+export type HistoryQuery = service.HistoryQuery
+export type SyncResult = service.SyncResult
+export type DeleteResult = service.DeleteResult
+export type HistoryFacets = service.HistoryFacets
 export type Analysis = sms.Analysis
 export type Receivers = sms.Receivers
 
 export type ErrorKind =
   | 'locked' | 'bad_passphrase' | 'no_account' | 'validation'
   | 'credentials' | 'rate_limit' | 'insufficient_credits' | 'invalid_receiver'
-  | 'invalid_request' | 'not_found' | 'network' | 'unknown' | 'internal'
+  | 'invalid_request' | 'too_many_results' | 'not_found' | 'network' | 'unknown' | 'internal'
 
 export class ApiError extends Error {
   constructor(public kind: ErrorKind, message: string) {
@@ -80,6 +86,12 @@ export const api = {
   cancelCampaign: (id: string) => call(() => Go.CancelCampaign(id)),
   retryFailed: (id: string) => call(() => Go.RetryFailed(id)),
   deleteCampaign: (id: string) => call(() => Go.DeleteCampaign(id)),
+  syncHistory: (days: number) => call(() => Go.SyncHistory(days)),
+  searchHistory: (q: HistoryQuery, offset: number, limit: number) => call(() => Go.SearchHistory(q, offset, limit)),
+  historyIds: (q: HistoryQuery) => call(() => Go.HistoryMatchingIDs(q)),
+  historyFacets: () => call(Go.HistoryFacets),
+  historyDetail: (id: number) => call(() => Go.HistoryDetail(id)),
+  deleteHistory: (ids: number[]) => call(() => Go.DeleteHistory(ids)),
   analyze: (m: string) => call(() => Go.AnalyzeMessage(m)),
   parseRecipients: (t: string) => call(() => Go.ParseRecipients(t)),
 }

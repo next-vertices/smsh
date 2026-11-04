@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"sync"
+	"time"
 )
 
 var e164 = regexp.MustCompile(`^\+[1-9]\d{7,14}$`)
@@ -21,6 +22,8 @@ type Mock struct {
 	CreditsPerReceiver float64
 	Sent               []SendRequest
 	Batches            map[string]Batch
+	Outbox             map[int64]Outgoing
+	MaxList            int // si > 0 : ListOutgoing échoue au-delà (comme OVH)
 	nextID             int64
 }
 
@@ -91,6 +94,54 @@ func (m *Mock) PackTiers(context.Context, string, string) ([]PackTier, error) {
 		return nil, m.Err
 	}
 	return []PackTier{{CreditsMin: 100, PricePerSMS: 0.06}, {CreditsMin: 5000, PricePerSMS: 0.05}}, nil
+}
+
+// ---- historique fictif ----
+
+func (m *Mock) ListOutgoing(_ context.Context, _ string, f OutgoingFilter) ([]int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	ids := []int64{}
+	for id, o := range m.Outbox {
+		if (f.From != nil && o.CreatedAt.Before(*f.From)) || (f.To != nil && o.CreatedAt.After(*f.To)) ||
+			(f.Receiver != "" && o.Receiver != f.Receiver) || (f.Tag != "" && o.Tag != f.Tag) {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	if m.MaxList > 0 && len(ids) > m.MaxList {
+		return nil, &Error{Kind: KindTooManyResults, Status: 400, Message: "Trop de résultats : OVH demande de restreindre la période."}
+	}
+	return ids, nil
+}
+
+func (m *Mock) GetOutgoing(_ context.Context, _ string, id int64) (Outgoing, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return Outgoing{}, m.Err
+	}
+	o, ok := m.Outbox[id]
+	if !ok {
+		return Outgoing{}, &Error{Kind: KindNotFound, Message: "SMS introuvable.", Status: 404}
+	}
+	return o, nil
+}
+
+func (m *Mock) DeleteOutgoing(_ context.Context, _ string, id int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return m.Err
+	}
+	if _, ok := m.Outbox[id]; !ok {
+		return &Error{Kind: KindNotFound, Message: "SMS introuvable.", Status: 404}
+	}
+	delete(m.Outbox, id)
+	return nil
 }
 
 // ---- batches fictifs : se terminent dès le premier GetBatch ----
@@ -187,9 +238,20 @@ func (m *Mock) Send(_ context.Context, req SendRequest) (SendResult, error) {
 	}
 	m.Info.CreditsLeft -= cost
 	res.CreditsRemoved = cost
-	for range res.ValidReceivers {
+	if m.Outbox == nil {
+		m.Outbox = map[int64]Outgoing{}
+	}
+	now := time.Now()
+	for _, r := range res.ValidReceivers {
 		m.nextID++
 		res.IDs = append(res.IDs, m.nextID)
+		o := Outgoing{ID: m.nextID, CreatedAt: now, SentAt: &now, Receiver: r, Sender: req.Sender,
+			Message: req.Message, Credits: per, Parts: 1, Tag: req.Tag}
+		if m.nextID%2 == 1 { // la moitié des SMS reçoit un accusé de réception
+			d := now.Add(2 * time.Second)
+			o.DeliveredAt = &d
+		}
+		m.Outbox[o.ID] = o
 	}
 	m.Sent = append(m.Sent, req)
 	return res, nil

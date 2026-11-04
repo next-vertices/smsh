@@ -224,6 +224,90 @@ export namespace service {
 	    }
 	}
 	
+	export class DeleteFailure {
+	    id: number;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteFailure(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.error = source["error"];
+	    }
+	}
+	export class DeleteResult {
+	    deleted: number;
+	    failed: DeleteFailure[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.deleted = source["deleted"];
+	        this.failed = this.convertValues(source["failed"], DeleteFailure);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class HistoryFacets {
+	    senders: string[];
+	    tags: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryFacets(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.senders = source["senders"];
+	        this.tags = source["tags"];
+	    }
+	}
+	export class HistoryQuery {
+	    query: string;
+	    receiver: string;
+	    status: string;
+	    sender: string;
+	    tag: string;
+	    dateFrom: string;
+	    dateTo: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.query = source["query"];
+	        this.receiver = source["receiver"];
+	        this.status = source["status"];
+	        this.sender = source["sender"];
+	        this.tag = source["tag"];
+	        this.dateFrom = source["dateFrom"];
+	        this.dateTo = source["dateTo"];
+	    }
+	}
 	export class ImportInfo {
 	    id: string;
 	    file: string;
@@ -513,6 +597,26 @@ export namespace service {
 		    return a;
 		}
 	}
+	export class SyncResult {
+	    listed: number;
+	    fetched: number;
+	    remaining: number;
+	    removed: number;
+	    errors: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SyncResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.listed = source["listed"];
+	        this.fetched = source["fetched"];
+	        this.remaining = source["remaining"];
+	        this.removed = source["removed"];
+	        this.errors = source["errors"];
+	    }
+	}
 
 }
 
@@ -608,6 +712,103 @@ export namespace store {
 	        this.error = source["error"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class HistoryItem {
+	    accountId: string;
+	    id: number;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    sentAt?: any;
+	    // Go type: time
+	    deliveredAt?: any;
+	    receiver: string;
+	    sender: string;
+	    message: string;
+	    credits: number;
+	    parts: number;
+	    tag: string;
+	    batchId: string;
+	    receipt: number;
+	    ptt: number;
+	    differed: number;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.accountId = source["accountId"];
+	        this.id = source["id"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.sentAt = this.convertValues(source["sentAt"], null);
+	        this.deliveredAt = this.convertValues(source["deliveredAt"], null);
+	        this.receiver = source["receiver"];
+	        this.sender = source["sender"];
+	        this.message = source["message"];
+	        this.credits = source["credits"];
+	        this.parts = source["parts"];
+	        this.tag = source["tag"];
+	        this.batchId = source["batchId"];
+	        this.receipt = source["receipt"];
+	        this.ptt = source["ptt"];
+	        this.differed = source["differed"];
+	        this.status = source["status"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class HistoryPage {
+	    items: HistoryItem[];
+	    total: number;
+	    credits: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryPage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.items = this.convertValues(source["items"], HistoryItem);
+	        this.total = source["total"];
+	        this.credits = source["credits"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

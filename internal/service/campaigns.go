@@ -371,7 +371,7 @@ func (s *Service) sendCampaignMessage(ctx context.Context, c store.Campaign, r s
 	defer cancel()
 	return cl.Send(ctx, ovh.SendRequest{
 		Service: acc.ServiceName, Message: r.Message, Receivers: []string{r.Phone}, Sender: c.Sender,
-		SendAt: at, StopClause: c.StopClause, Unicode: sms.Analyze(r.Message).Encoding == sms.UCS2,
+		SendAt: at, StopClause: c.StopClause, Unicode: sms.Analyze(r.Message).Encoding == sms.UCS2, Tag: c.ID,
 	})
 }
 

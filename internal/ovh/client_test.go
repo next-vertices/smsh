@@ -30,6 +30,11 @@ func (f *fakeCaller) GetWithContext(_ context.Context, url string, res interface
 	return json.Unmarshal([]byte(f.gets[url]), res)
 }
 
+func (f *fakeCaller) DeleteWithContext(_ context.Context, url string, _ interface{}) error {
+	f.lastURL = url
+	return f.err
+}
+
 func (f *fakeCaller) GetUnAuthWithContext(ctx context.Context, url string, res interface{}) error {
 	return f.GetWithContext(ctx, url, res)
 }
@@ -215,5 +220,30 @@ func TestBatchCalls(t *testing.T) {
 	past := c.now().Add(-time.Hour)
 	if _, err := c.CreateBatch(context.Background(), BatchRequest{Service: "s", Name: "n", Message: "m", To: []string{"+33612345678"}, SendAt: &past}); KindOf(err) != KindInvalidRequest {
 		t.Errorf("date passée : %v", err)
+	}
+}
+
+func TestOutgoingCalls(t *testing.T) {
+	f := &fakeCaller{gets: map[string]string{
+		"/sms/sms-ab1/outgoing?creationDatetime.from=2026-01-01T00%3A00%3A00Z&receiver=%2B33612345678": `[11,12]`,
+		"/sms/sms-ab1/outgoing/11": `{"id":11,"creationDatetime":"2026-01-01T10:00:00+01:00","sentAt":"2026-01-01T10:00:05+01:00","deliveredAt":null,` +
+			`"receiver":"+33612345678","sender":"Smsh","message":"Salut","credits":1,"numberOfSms":1,"tag":"t","batchID":"","deliveryReceipt":0,"ptt":0,"differedDelivery":0}`,
+	}}
+	c := newTestClient(f)
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	ids, err := c.ListOutgoing(context.Background(), "sms-ab1", OutgoingFilter{From: &from, Receiver: "+33612345678"})
+	if err != nil || len(ids) != 2 || ids[0] != 11 {
+		t.Fatalf("ids=%v err=%v", ids, err)
+	}
+	o, err := c.GetOutgoing(context.Background(), "sms-ab1", 11)
+	if err != nil || o.Receiver != "+33612345678" || o.SentAt == nil || o.DeliveredAt != nil || o.Message != "Salut" || o.Parts != 1 {
+		t.Fatalf("o=%+v err=%v", o, err)
+	}
+	if err := c.DeleteOutgoing(context.Background(), "sms-ab1", 11); err != nil || f.lastURL != "/sms/sms-ab1/outgoing/11" {
+		t.Fatalf("delete err=%v url=%s", err, f.lastURL)
+	}
+	f.err = &goovh.APIError{Code: 404, Message: "not found"}
+	if err := c.DeleteOutgoing(context.Background(), "sms-ab1", 11); KindOf(err) != KindNotFound {
+		t.Errorf("delete 404 : %v", err)
 	}
 }

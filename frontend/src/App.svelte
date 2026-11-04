@@ -3,7 +3,7 @@
   import UnlockModal from './components/UnlockModal.svelte'
   import Onboarding from './views/Onboarding.svelte'
   import Campaigns from './views/Campaigns.svelte'
-  import Placeholder from './views/Placeholder.svelte'
+  import History from './views/History.svelte'
   import Send from './views/Send.svelte'
   import Settings from './views/Settings.svelte'
   import { api } from './lib/api'
@@ -83,7 +83,7 @@
       {:else if ui.view === 'campaigns'}
         <Campaigns />
       {:else if ui.view === 'history'}
-        <Placeholder title="Historique" text="Liste, recherche et suppression des SMS envoyés : à venir." />
+        <History />
       {:else}
         <Settings />
       {/if}

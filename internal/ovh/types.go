@@ -41,6 +41,7 @@ type SendRequest struct {
 	SendAt     *time.Time // nil : envoi immédiat
 	StopClause bool       // true : OVH ajoute la mention STOP (SMS commercial)
 	Unicode    bool       // true : message hors GSM-7
+	Tag        string     // étiquette de regroupement (ex. ID de campagne)
 }
 
 // SendResult est la réponse d'OVH à un envoi.
@@ -114,12 +115,44 @@ type BatchStats struct {
 	Stoplisted       int64   `json:"stoplisted"`
 }
 
+// OutgoingFilter restreint la liste des SMS envoyés (GET /sms/{serviceName}/outgoing).
+type OutgoingFilter struct {
+	From     *time.Time // creationDatetime >=
+	To       *time.Time // creationDatetime <=
+	Receiver string
+	Sender   string
+	Tag      string
+	BatchID  string
+}
+
+// Outgoing est un SMS envoyé (GET /sms/{serviceName}/outgoing/{id}).
+type Outgoing struct {
+	ID          int64      `json:"id"`
+	CreatedAt   time.Time  `json:"creationDatetime"`
+	SentAt      *time.Time `json:"sentAt"`
+	DeliveredAt *time.Time `json:"deliveredAt"`
+	Receiver    string     `json:"receiver"`
+	Sender      string     `json:"sender"`
+	Message     string     `json:"message"`
+	Credits     float64    `json:"credits"`
+	Parts       int        `json:"numberOfSms"`
+	Tag         string     `json:"tag"`
+	BatchID     string     `json:"batchID"`
+	Receipt     int64      `json:"deliveryReceipt"`
+	PTT         int64      `json:"ptt"`
+	Differed    int64      `json:"differedDelivery"`
+}
+
 // Client est l'accès à l'API SMS d'OVH.
 type Client interface {
 	ListServices(ctx context.Context) ([]string, error)
 	Account(ctx context.Context, service string) (AccountInfo, error)
 	Senders(ctx context.Context, service string) ([]Sender, error)
 	Send(ctx context.Context, req SendRequest) (SendResult, error)
+	// Historique des SMS envoyés.
+	ListOutgoing(ctx context.Context, service string, f OutgoingFilter) ([]int64, error)
+	GetOutgoing(ctx context.Context, service string, id int64) (Outgoing, error)
+	DeleteOutgoing(ctx context.Context, service string, id int64) error
 	// Campagnes natives OVH (batches).
 	CreateBatch(ctx context.Context, req BatchRequest) (Batch, error)
 	GetBatch(ctx context.Context, service, id string) (Batch, error)

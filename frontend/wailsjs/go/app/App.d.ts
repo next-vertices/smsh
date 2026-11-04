@@ -15,11 +15,19 @@ export function DeleteAccount(arg1:string):Promise<void>;
 
 export function DeleteCampaign(arg1:string):Promise<void>;
 
+export function DeleteHistory(arg1:Array<number>):Promise<service.DeleteResult>;
+
 export function Endpoints():Promise<Array<string>>;
 
 export function EstimateCost(arg1:service.CostInput):Promise<service.CostEstimate>;
 
 export function GetCampaign(arg1:string):Promise<store.Campaign>;
+
+export function HistoryDetail(arg1:number):Promise<store.HistoryItem>;
+
+export function HistoryFacets():Promise<service.HistoryFacets>;
+
+export function HistoryMatchingIDs(arg1:service.HistoryQuery):Promise<Array<number>>;
 
 export function LaunchCampaign(arg1:service.LaunchInput):Promise<store.Campaign>;
 
@@ -43,6 +51,8 @@ export function RetryFailed(arg1:string):Promise<number>;
 
 export function SaveAccount(arg1:creds.Input):Promise<creds.Account>;
 
+export function SearchHistory(arg1:service.HistoryQuery,arg2:number,arg3:number):Promise<store.HistoryPage>;
+
 export function Send(arg1:service.SendInput):Promise<service.SendOutcome>;
 
 export function SetActiveAccount(arg1:string):Promise<void>;
@@ -50,6 +60,8 @@ export function SetActiveAccount(arg1:string):Promise<void>;
 export function SimulateCampaign(arg1:service.PlanInput):Promise<service.PlanReport>;
 
 export function Status():Promise<creds.Status>;
+
+export function SyncHistory(arg1:number):Promise<service.SyncResult>;
 
 export function TestConnection(arg1:creds.Input):Promise<service.ServiceInfo>;
 
