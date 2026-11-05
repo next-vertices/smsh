@@ -5,8 +5,10 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -70,7 +72,27 @@ func New() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{svc: service.New(creds.Open(dir), st)}, nil
+	svc := service.New(creds.Open(dir), st)
+	svc.Logf = fileLogger(filepath.Join(dir, "smsh.log"))
+	return &App{svc: svc}, nil
+}
+
+// fileLogger écrit des lignes horodatées (diagnostic, sans secrets), fichier tronqué au-delà de 256 Ko.
+func fileLogger(path string) func(string, ...any) {
+	if fi, err := os.Stat(path); err == nil && fi.Size() > 256<<10 {
+		_ = os.Remove(path)
+	}
+	var mu sync.Mutex
+	return func(format string, args ...any) {
+		mu.Lock()
+		defer mu.Unlock()
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			return
+		}
+		defer f.Close()
+		fmt.Fprintf(f, "%s %s\n", time.Now().Format("15:04:05.000"), fmt.Sprintf(format, args...))
+	}
 }
 
 // Startup est appelé par Wails au démarrage.
@@ -168,6 +190,25 @@ func (a *App) PickCSV() (service.ImportInfo, error) {
 	}
 	info, err := a.svc.ImportCSV(path)
 	return info, wrap(err)
+}
+
+// csvTemplate : modèle prêt pour Excel (BOM UTF-8, séparateur « ; »).
+const csvTemplate = "\ufefftelephone;prenom;nom;ville\r\n" +
+	"0612345678;Jean;Dupont;Lyon\r\n" +
+	"+33698765432;Léa;Martin;Paris\r\n"
+
+// SaveCSVTemplate propose d'enregistrer un fichier CSV modèle.
+// Renvoie le chemin écrit, ou "" si l'utilisateur annule.
+func (a *App) SaveCSVTemplate() (string, error) {
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Enregistrer le modèle CSV",
+		DefaultFilename: "modele-campagne.csv",
+		Filters:         []runtime.FileFilter{{DisplayName: "Fichiers CSV (*.csv)", Pattern: "*.csv"}},
+	})
+	if err != nil || path == "" {
+		return "", wrap(err)
+	}
+	return path, wrap(os.WriteFile(path, []byte(csvTemplate), 0o644))
 }
 
 func (a *App) SimulateCampaign(in service.PlanInput) (service.PlanReport, error) {

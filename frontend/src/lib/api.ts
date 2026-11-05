@@ -75,6 +75,7 @@ export const api = {
   send: (i: SendInput) => call(() => Go.Send(i)),
   maxRecipients: () => call(Go.MaxRecipients),
   pickCsv: () => call(Go.PickCSV),
+  saveCsvTemplate: () => call(Go.SaveCSVTemplate),
   simulate: (i: PlanInput) => call(() => Go.SimulateCampaign(i)),
   launch: (i: LaunchInput) => call(() => Go.LaunchCampaign(i)),
   campaigns: () => call(Go.ListCampaigns),

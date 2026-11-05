@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -197,5 +198,22 @@ func TestRetryFailedAndCancelLocal(t *testing.T) {
 	}
 	if n, err := s.RetryFailed(ctx, c.ID); err != nil || n != 0 {
 		t.Errorf("rien à relancer : n=%d err=%v", n, err)
+	}
+}
+
+// Régression : un CSV sans ligne invalide doit produire "invalid":[] (et non null), sinon le front plante.
+func TestSimulateJSONArraysNeverNull(t *testing.T) {
+	s, _ := newTestService(t)
+	info, err := s.ImportCSV(writeCSV(t, "telephone\n0612345678\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rep, err := s.SimulateCampaign(context.Background(), PlanInput{ImportID: info.ID, PhoneColumn: 0, Template: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(rep)
+	if strings.Contains(string(b), ":null") {
+		t.Fatalf("null dans le JSON : %s", b)
 	}
 }

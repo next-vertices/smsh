@@ -51,6 +51,8 @@ export function RetryFailed(arg1:string):Promise<number>;
 
 export function SaveAccount(arg1:creds.Input):Promise<creds.Account>;
 
+export function SaveCSVTemplate():Promise<string>;
+
 export function SearchHistory(arg1:service.HistoryQuery,arg2:number,arg3:number):Promise<store.HistoryPage>;
 
 export function Send(arg1:service.SendInput):Promise<service.SendOutcome>;

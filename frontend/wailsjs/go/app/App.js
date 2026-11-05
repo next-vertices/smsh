@@ -94,6 +94,10 @@ export function SaveAccount(arg1) {
   return window['go']['app']['App']['SaveAccount'](arg1);
 }
 
+export function SaveCSVTemplate() {
+  return window['go']['app']['App']['SaveCSVTemplate']();
+}
+
 export function SearchHistory(arg1, arg2, arg3) {
   return window['go']['app']['App']['SearchHistory'](arg1, arg2, arg3);
 }

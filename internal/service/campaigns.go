@@ -154,6 +154,7 @@ func (s *Service) makePlan(ctx context.Context, in PlanInput) (plan, error) {
 		Lines: []CostLine{}, Blocking: []string{}, Warnings: []string{}}}
 	r := &p.report
 
+	s.logf("simulate: début (mode=%q)", in.Mode)
 	t, ok := s.imports.get(in.ImportID)
 	if !ok {
 		return p, invalid("Fichier CSV non chargé : importez-le à nouveau.")
@@ -164,7 +165,7 @@ func (s *Service) makePlan(ctx context.Context, in PlanInput) (plan, error) {
 	}
 	p.contacts = contacts.Valid
 	r.Recipients, r.Dupes, r.InvalidCount = len(contacts.Valid), contacts.Dupes, len(contacts.Invalid)
-	r.Invalid = contacts.Invalid[:min(len(contacts.Invalid), issueCount)]
+	r.Invalid = append(r.Invalid, contacts.Invalid[:min(len(contacts.Invalid), issueCount)]...) // jamais nil : le front itère dessus
 	if r.InvalidCount > 0 {
 		r.Warnings = append(r.Warnings, fmt.Sprintf("%d ligne(s) ignorée(s) : numéro invalide.", r.InvalidCount))
 	}
@@ -245,19 +246,27 @@ func (s *Service) makePlan(ctx context.Context, in PlanInput) (plan, error) {
 		r.Warnings = append(r.Warnings, fmt.Sprintf("%d numéro(s) d'un pays non reconnu : coût non estimé.", r.UnknownCountry))
 	}
 
+	s.logf("simulate: messages rendus (%d destinataires)", r.Recipients)
 	// Tarifs : nécessitent un compte actif ; une indisponibilité n'empêche pas la simulation.
 	if a, sec, err := s.Creds.Active(); err != nil {
 		r.Warnings = append(r.Warnings, "Coût non estimé : aucun compte accessible.")
 	} else if cl, err := s.NewClient(toOVH(a, sec)); err == nil {
-		if pr, err := s.priceLines(ctx, cl, agg); err != nil {
+		s.logf("simulate: client créé, tarifs…")
+		pr, err := s.priceLines(ctx, cl, agg)
+		s.logf("simulate: tarifs terminés (err=%v)", err)
+		if err != nil {
 			r.Warnings = append(r.Warnings, "Coût non estimé : "+err.Error())
 		} else {
 			r.Lines, r.TotalCredits, r.PriceMin, r.PriceMax, r.Currency = pr.Lines, pr.TotalCredits, pr.PriceMin, pr.PriceMax, pr.Currency
-			if a, err := cl.Account(ctx, a.ServiceName); err == nil && r.TotalCredits > a.CreditsLeft {
+			s.logf("simulate: solde…")
+			ai, aerr := cl.Account(ctx, a.ServiceName)
+			s.logf("simulate: solde terminé (err=%v)", aerr)
+			if a := ai; aerr == nil && r.TotalCredits > a.CreditsLeft {
 				r.Blocking = append(r.Blocking, fmt.Sprintf("Crédits insuffisants : %v nécessaires, %v disponibles.", r.TotalCredits, a.CreditsLeft))
 			}
 		}
 	}
+	s.logf("simulate: terminé")
 	if r.Mode == store.ModeLocal {
 		rate := in.Rate
 		if rate <= 0 {
@@ -448,7 +457,12 @@ func (s *Service) refreshBatch(ctx context.Context, c store.Campaign, force bool
 	}
 	errMsg := strings.Join(msgs, " ; ")
 	status := batchStatus(b.Status)
-	sent := int(st.Delivered + st.Sent + st.Stoplisted)
+	// Les compteurs OVH se recouvrent (un SMS délivré compte aussi comme envoyé) : on prend le plus grand,
+	// et on ne dépasse jamais le total.
+	sent := int(max(st.Delivered, st.Sent) + st.Stoplisted)
+	if t := int(b.TotalRecords); t > 0 {
+		sent = min(sent, max(t-int(st.Failed), 0))
+	}
 	if err := s.Store.SetProgress(ctx, c.ID, status, int(b.TotalRecords), sent, int(st.Failed), credits, errMsg); err != nil {
 		return c
 	}

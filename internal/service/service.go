@@ -31,6 +31,7 @@ type Service struct {
 	Now       func() time.Time
 	Store     *store.Store
 	Runner    *campaign.Runner
+	Logf      func(format string, args ...any) // diagnostic (jamais de secrets) ; peut être nil
 
 	syncMu  sync.Mutex
 	rates   rateCache
@@ -215,5 +216,11 @@ func Describe(err error) Problem {
 		return Problem{string(oe.Kind), oe.Message}
 	default:
 		return Problem{"internal", fmt.Sprintf("Erreur interne : %v", err)}
+	}
+}
+
+func (s *Service) logf(format string, args ...any) {
+	if s.Logf != nil {
+		s.Logf(format, args...)
 	}
 }

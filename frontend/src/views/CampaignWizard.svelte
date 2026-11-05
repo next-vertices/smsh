@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import Confirm from '../components/Confirm.svelte'
+  import CsvTemplate from '../components/CsvTemplate.svelte'
   import { api, ApiError, type Campaign, type ImportInfo, type PlanReport } from '../lib/api'
   import { duration, modeLabel, priceRange } from '../lib/format'
   import { ui } from '../lib/state.svelte'
@@ -45,28 +47,47 @@
     }
   }
 
+  let rerunTick = $state(0)
+  const rerun = () => { error = ''; rerunTick++ }
+
   // Simulation automatique (dry-run) 600 ms après la dernière modification.
+  // L'effet ne dépend que d'une clé texte : il ne se relance que si une entrée change vraiment.
+  const simKey = $derived(JSON.stringify({ rerunTick, importId: imp?.id ?? '', phoneColumn: phoneCol, template, mode, stopClause, senderType: '', rate }))
   let seq = 0
+  let simCalls = $state(0)
+  let simStart = $state(0)
   $effect(() => {
-    const input = { importId: imp?.id ?? '', phoneColumn: phoneCol, template, mode, stopClause, senderType: '', rate }
-    const n = ++seq
-    if (!imp || phoneCol < 0 || !template.trim()) { report = null; simulating = false; return }
-    simulating = true
-    const t = setTimeout(async () => {
-      try {
-        const r = await api.simulate(input)
-        if (n !== seq) return
-        report = r
-        previewIdx = 0
-        error = ''
-      } catch (e) {
-        if (n === seq) { report = null; error = e instanceof ApiError ? e.message : String(e) }
-      } finally {
-        if (n === seq) simulating = false
-      }
-    }, 600)
-    return () => clearTimeout(t)
+    const key = simKey
+    untrack(() => {
+      const n = ++seq
+      if (!imp || phoneCol < 0 || !template.trim()) { report = null; simulating = false; return }
+      simulating = true
+      const input = JSON.parse(key)
+      delete input.rerunTick
+      timer = setTimeout(async () => {
+        simCalls++
+        simStart = Date.now()
+        try {
+          const r = await Promise.race([
+            api.simulate(input),
+            new Promise<never>((_, rej) => setTimeout(() => rej(new ApiError('unknown', 'La simulation met trop de temps à répondre (25 s).')), 25000)),
+          ])
+          if (n !== seq) return
+          // Tableaux jamais null (Go sérialise une slice nil en null).
+          r.invalid ??= []; r.variables ??= []; r.samples ??= []; r.lines ??= []; r.blocking ??= []; r.warnings ??= []
+          report = r
+          previewIdx = 0
+          error = ''
+        } catch (e) {
+          if (n === seq) { report = null; error = e instanceof ApiError ? e.message : String(e) }
+        } finally {
+          if (n === seq) simulating = false
+        }
+      }, 600)
+    })
+    return () => clearTimeout(timer)
   })
+  let timer: ReturnType<typeof setTimeout>
 
   function insertVar(v: string) {
     const s = tpl.selectionStart ?? template.length
@@ -116,6 +137,8 @@
   <div class="row">
     <button onclick={pick}>{imp ? 'Changer de fichier…' : 'Choisir un fichier CSV…'}</button>
     {#if imp}<span><strong>{imp.file}</strong> <span class="muted">· {imp.rows} ligne(s)</span></span>{/if}
+    <span class="grow"></span>
+    <CsvTemplate label="Modèle CSV" />
   </div>
   <div class="hint">La première ligne doit contenir les en-têtes. Séparateur ; , ou tabulation, UTF-8 ou Excel (Windows-1252).</div>
   {#if imp}
@@ -203,7 +226,10 @@
   <div class="card">
     <h2>3. Simulation <span class="muted small">(dry-run : rien n'est envoyé)</span></h2>
     {#if simulating}
-      <div class="muted">Simulation en cours…</div>
+      <div class="muted">Simulation en cours… <span class="small">(appel n°{simCalls})</span></div>
+    {:else if !report}
+      <div class="alert warn" style="margin: 0 0 10px">La simulation n'a pas abouti{error ? ' : ' + error : '.'}</div>
+      <button onclick={rerun}>Relancer la simulation</button>
     {:else if report}
       <div class="small" style="margin-bottom: 10px">
         <strong>{report.recipients}</strong> destinataire(s) valide(s)
