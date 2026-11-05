@@ -156,8 +156,11 @@ kbd {
   .grid3 { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 720px) {
-  .grid2, .grid3 { grid-template-columns: 1fr; }
+  .grid2 { grid-template-columns: 1fr; }
   .card { padding: 14px; }
+}
+@media (max-width: 420px) {
+  .grid3 { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .cost .head { flex-direction: column; gap: 10px; }

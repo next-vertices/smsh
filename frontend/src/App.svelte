@@ -67,7 +67,7 @@
           <div class="small muted lbl">Compte actif</div>
           <strong>{active.name}</strong>
           {#if ui.overview}
-            <div class="small">{ui.overview.creditsLeft} crédit(s)</div>
+            <div class="small lbl2">{ui.overview.creditsLeft} crédit(s)</div>
           {:else if ui.overviewError}
             <div class="small err" title={ui.overviewError}>Connexion impossible</div>
           {/if}
@@ -133,5 +133,8 @@
     .acct { border-top: none; padding: 0 6px; white-space: nowrap; }
     .acct .lbl { display: none; }
     main { padding: 16px 14px; }
+  }
+  @media (max-width: 560px) {
+    .acct .lbl2 { display: none; }
   }
 </style>
