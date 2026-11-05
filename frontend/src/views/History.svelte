@@ -9,11 +9,13 @@
   import { dateFr } from '../lib/format'
   import { ui } from '../lib/state.svelte'
 
-  const PAGE = 50
+  const PAGE_SIZES = [25, 50, 100, 200]
   const AUTO_SYNC_MS = 5 * 60 * 1000
 
   let q = $state<HistoryQuery>({ query: '', receiver: '', status: '', sender: '', tag: '', dateFrom: '', dateTo: '' })
   let items = $state<HistoryItem[]>([])
+  let page = $state(0) // page courante (0 = première)
+  let pageSize = $state(50)
   let total = $state(0)
   let credits = $state(0)
   let facets = $state<HistoryFacets>({ senders: [], tags: [] })
@@ -54,15 +56,37 @@
 
   function fail(e: unknown) { error = e instanceof ApiError ? e.message : String(e) }
 
-  async function load(reset: boolean) {
+  const pageCount = $derived(Math.max(1, Math.ceil(total / pageSize)))
+  const rangeFrom = $derived(total === 0 ? 0 : page * pageSize + 1)
+  const rangeTo = $derived(Math.min(total, page * pageSize + items.length))
+
+  // Charge la page courante ; si elle n'existe plus (suppressions, filtres), recule sur la dernière.
+  async function load() {
     loading = true
     try {
-      const p = await api.searchHistory($state.snapshot(q), reset ? 0 : items.length, PAGE)
-      items = reset ? p.items : [...items, ...p.items]
+      let p = await api.searchHistory($state.snapshot(q), page * pageSize, pageSize)
+      const last = Math.max(0, Math.ceil(p.total / pageSize) - 1)
+      if (page > last) {
+        page = last
+        p = await api.searchHistory($state.snapshot(q), page * pageSize, pageSize)
+      }
+      items = p.items
       total = p.total
       credits = p.credits
       error = ''
     } catch (e) { fail(e) } finally { loading = false }
+  }
+
+  function goto(n: number) {
+    const target = Math.min(Math.max(0, Math.trunc(n) || 0), pageCount - 1)
+    if (target === page) return
+    page = target
+    load()
+  }
+
+  function changeSize() {
+    page = 0
+    load()
   }
 
   async function loadFacets() {
@@ -91,7 +115,7 @@
         if (total < 0) total = r.fetched + r.remaining
         progress = { done: Math.min(fetched, total), total }
         syncResult = { ...r, fetched }
-        await Promise.all([load(true), loadFacets()])
+        await Promise.all([load(), loadFacets()])
         if (r.errors.length || r.remaining === 0 || r.fetched === 0 || stopRequested) break
       }
       ui.historySyncedAt = Date.now()
@@ -104,7 +128,8 @@
     const t = setTimeout(() => {
       sel = {}
       selectedAll = false
-      load(true)
+      page = 0
+      load()
     }, 300)
     return () => clearTimeout(t)
   })
@@ -147,7 +172,7 @@
       detail = null
       sel = {}
       selectedAll = false
-      await Promise.all([load(true), loadFacets()])
+      await Promise.all([load(), loadFacets()])
       refreshOverview()
     } catch (e) { confirmIds = null; fail(e) } finally { deleting = false }
   }
@@ -293,6 +318,7 @@
 
 <div class="hlayout" class:open={docked && detail}>
 <div class="hlist">
+{@render pager()}
 <div class="card" style="padding: 0; overflow: hidden">
   <div class="tablewrap">
     <table class="hist">
@@ -327,17 +353,32 @@
     </table>
   </div>
 </div>
-{#if items.length < total}
-  <div class="row" style="justify-content: center; margin: 12px 0 32px">
-    <button onclick={() => load(false)} disabled={loading}>Afficher plus ({total - items.length} restants)</button>
-  </div>
-{/if}
+{@render pager()}
 
 </div>
 {#if docked}{@render dockPanel()}{/if}
 </div>
 </div>
 </div>
+
+{#snippet pager()}
+  <nav class="pager" aria-label="Pagination">
+    <span class="small muted">{rangeFrom}–{rangeTo} sur {total}</span>
+    <span class="grow"></span>
+    <label class="small muted" for="psize" style="margin: 0">Par page</label>
+    <select id="psize" bind:value={pageSize} onchange={changeSize} style="width: auto">
+      {#each PAGE_SIZES as n}<option value={n}>{n}</option>{/each}
+    </select>
+    <button onclick={() => goto(0)} disabled={page === 0 || loading} aria-label="Première page">«</button>
+    <button onclick={() => goto(page - 1)} disabled={page === 0 || loading} aria-label="Page précédente">‹</button>
+    <span class="small">Page
+      <input class="pnum" type="number" min="1" max={pageCount} value={page + 1}
+        onchange={(e) => goto(Number(e.currentTarget.value) - 1)} aria-label="Numéro de page" />
+      / {pageCount}</span>
+    <button onclick={() => goto(page + 1)} disabled={page >= pageCount - 1 || loading} aria-label="Page suivante">›</button>
+    <button onclick={() => goto(pageCount - 1)} disabled={page >= pageCount - 1 || loading} aria-label="Dernière page">»</button>
+  </nav>
+{/snippet}
 
 {#snippet dockPanel()}
   {#if detail}
@@ -390,6 +431,9 @@
 {/if}
 
 <style>
+  .pager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+  .pager button { padding: 4px 10px; }
+  .pnum { width: 64px !important; padding: 4px 6px !important; text-align: center; }
   .c-l, .c-xl { display: none; }
   .hlayout { display: block; }
   .dock { position: sticky; top: 0; }
