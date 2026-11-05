@@ -5,8 +5,11 @@ go 1.26.0
 require (
 	filippo.io/age v1.3.2
 	github.com/ovh/go-ovh v1.9.0
+	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.9
 	github.com/wailsapp/wails/v2 v2.17.1
 	github.com/zalando/go-keyring v0.2.8
+	golang.org/x/term v0.47.0
 	golang.org/x/text v0.43.0
 	modernc.org/sqlite v1.61.1
 )
@@ -23,6 +26,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/labstack/echo/v4 v4.16.1 // indirect
 	github.com/labstack/gommon v0.5.0 // indirect

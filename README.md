@@ -81,6 +81,36 @@ Un faux OVH et un coffre en mémoire remplacent l'API : l'onboarding accepte n'i
 $env:SMSH_MOCK = "1"; .\build\bin\smsh.exe
 ```
 
+## Ligne de commande
+
+Le même exécutable sert d'application et de CLI : `smsh.exe` sans argument ouvre la fenêtre, `smsh.exe <commande>` s'exécute dans le terminal. Il partage les comptes, le coffre de clés et la base locale de l'application : un compte configuré dans l'interface est immédiatement utilisable. Les comptes se créent et se modifient dans l'application.
+
+```powershell
+.\build\bin\smsh.exe status
+.\build\bin\smsh.exe send 0612345678 -m "Bonjour" --dry-run
+```
+
+| Commande | Rôle |
+|---|---|
+| `smsh status` | teste la connexion, affiche solde et expéditeurs |
+| `smsh account ls` / `account use <id\|nom>` | comptes enregistrés (secrets masqués), compte actif |
+| `smsh send <num>... -m "texte"` | envoi unitaire (5 numéros max), coût affiché avant confirmation |
+| `smsh sync [--days 30]` | met à jour le cache local de l'historique |
+| `smsh ls [filtres] [--sync]` | liste des SMS (`--to`, `--status`, `--from`, `--until`, `-q`, `--tag`, `-n`) |
+| `smsh rm <id>...` ou `rm --match <filtres>` | supprime chez OVH et dans le cache |
+| `smsh campaign run <fichier.csv> -m "Bonjour {prenom}"` | simule puis lance (`--dry-run`, `--mode batch\|local`, `--rate`, `--at`, `--phone-col`) |
+| `smsh campaign ls` / `show <id> [--recipients]` | suivi |
+| `smsh campaign resume\|retry\|cancel\|rm <id>` | reprise, relance des échecs, annulation, suppression |
+
+Points à connaître :
+- `--json` sur toutes les commandes (erreurs comprises : `{"error":{"kind","message"}}` sur la sortie standard).
+- Les actions qui envoient ou suppriment demandent une confirmation ; `--yes` la remplace (obligatoire sans terminal).
+- Codes de sortie : `0` succès, `1` erreur, `2` erreur d'usage. Une campagne avec des échecs ou en pause sort en `1`.
+- Coffre à passphrase : variable `SMSH_PASSPHRASE`, sinon saisie masquée.
+- Campagne **locale** : exécutée par le terminal qui l'a lancée. `Ctrl-C` la met en pause, `smsh campaign resume <id>` la reprend. Une campagne **batch** est traitée par OVH et continue sans le terminal (`--wait` pour l'attendre).
+- `smsh.exe` étant une application « fenêtre », `cmd` et PowerShell ne l'attendent pas : pour récupérer le code de sortie ou chaîner des commandes, utilisez `Start-Process -Wait -NoNewWindow` / `start /wait`, ou redirigez la sortie (`.\smsh.exe ls --json | Out-String`).
+- `SMSH_MOCK=1` : simulation sans réseau ; `SMSH_MOCK_DIR=<dossier>` conserve les campagnes entre deux appels.
+
 ## Configuration OVH
 
 Créez un token sur la page de création de token de votre région :
@@ -130,7 +160,7 @@ internal/
   sms/               Règles pures : encodage GSM-7/UCS-2, segments, numéros, pays
   store/             SQLite pur Go (modernc.org/sqlite, sans CGO)
 frontend/            UI Svelte + TypeScript
-cmd/smsh/            CLI (à venir)
+internal/cli/        CLI cobra, embarquée dans le même exécutable que l'application
 ```
 
 Principes :
@@ -160,5 +190,5 @@ Le détecteur de concurrence (`-race`) nécessite un compilateur C ; il n'est pa
 ## Feuille de route
 
 - [ ] Export CSV (campagnes, historique) depuis les Paramètres
-- [ ] CLI : `smsh send`, `smsh ls`, `smsh rm`, `smsh campaign run`, sortie `--json`
+- [x] CLI : `send`, `ls`, `rm`, `sync`, `status`, `account`, `campaign`, sortie `--json`
 - [ ] Statut d'échec explicite dans l'historique (selon les codes OVH réels)

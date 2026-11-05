@@ -42,9 +42,16 @@ type Service struct {
 // New crée un Service branché sur la vraie API OVH. Les campagnes interrompues
 // par une fermeture de l'application sont remises en pause.
 func New(m *creds.Manager, st *store.Store) *Service {
+	s := Open(m, st)
+	_ = st.ResetInterrupted(context.Background())
+	return s
+}
+
+// Open crée un Service sans toucher à l'état des campagnes : pour un processus
+// secondaire (CLI) qui ne doit pas mettre en pause les campagnes d'une autre instance.
+func Open(m *creds.Manager, st *store.Store) *Service {
 	s := &Service{Creds: m, NewClient: ovh.New, Now: time.Now, Store: st}
 	s.Runner = campaign.NewRunner(st, s.sendCampaignMessage)
-	_ = st.ResetInterrupted(context.Background())
 	return s
 }
 
