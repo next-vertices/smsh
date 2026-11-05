@@ -128,7 +128,7 @@
 
   // Derniers SMS (cache local de l'historique) : panneau affiché sur très grand écran.
   let recent = $state<HistoryItem[]>([])
-  api.searchHistory({ query: '', receiver: '', status: '', sender: '', tag: '', dateFrom: '', dateTo: '' }, 0, 8)
+  api.searchHistory({ query: '', receiver: '', status: '', sender: '', tag: '', dateFrom: '', dateTo: '' }, 0, 40)
     .then((p) => (recent = p.items)).catch(() => {})
 </script>
 
@@ -321,12 +321,18 @@
     .side { position: sticky; top: 0; }
   }
   @media (min-width: 1920px) {
-    .send { grid-template-columns: minmax(0, 820px) 460px; }
+    .send { grid-template-columns: minmax(0, 1fr) 480px; }
   }
   /* 27"-38" : troisième colonne avec les derniers envois */
   @media (min-width: 2400px) {
-    .send { grid-template-columns: minmax(0, 860px) 480px minmax(320px, 560px); }
-    .recent { display: block; position: sticky; top: 0; }
+    .send { grid-template-columns: minmax(480px, 1.15fr) minmax(440px, 1fr) minmax(400px, 1fr); gap: 0 24px; }
+    .send { align-items: stretch; height: calc(100vh - 120px); min-height: 520px; }
+    .send > :global(*) { min-height: 0; }
+    .recent { display: block; }
+    .recent .card { height: 100%; overflow-y: auto; margin-bottom: 0; }
+    .side { position: static; }
+    .send :global(textarea#msg) { min-height: 220px; }
+    .send :global(textarea#rcpt) { min-height: 130px; }
   }
   .counter { display: flex; gap: 14px; margin-top: 6px; font-size: 12px; color: var(--muted); align-items: center; flex-wrap: wrap; }
   .counter.warn { color: var(--warn); }
