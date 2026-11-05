@@ -34,7 +34,9 @@
 
   function onkeydown(e: KeyboardEvent) {
     if (!e.ctrlKey || e.shiftKey || e.altKey) return
-    const i = Number(e.key) - 1
+    // e.code (position physique) : sur AZERTY, la touche « 1 » non shiftée donne « & ».
+    const m = /^(?:Digit|Numpad)([1-9])$/.exec(e.code)
+    const i = m ? Number(m[1]) - 1 : Number(e.key) - 1
     if (i >= 0 && i < nav.length && ui.accounts.length) {
       e.preventDefault()
       ui.view = nav[i].id
