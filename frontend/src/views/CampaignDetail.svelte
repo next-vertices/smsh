@@ -99,7 +99,8 @@
     <div class="alert" class:warn={c.status === 'paused'} class:error={c.status !== 'paused'} role="alert">{c.error}</div>
   {/if}
 
-  <div class="card">
+  <div class="dgrid" class:solo={!isLocal}>
+  <div class="card side">
     <div class="bar" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100">
       <div class="fill" style="width: {pct}%"></div>
     </div>
@@ -170,6 +171,7 @@
       {/if}
     </div>
   {/if}
+  </div>
 {/if}
 
 {#if confirm && c}
@@ -186,6 +188,13 @@
 {/if}
 
 <style>
+  .dgrid { display: block; }
+  @media (min-width: 1400px) {
+    .dgrid:not(.solo) { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 0 20px; align-items: start; }
+    .dgrid .side { position: sticky; top: 0; }
+    .tablewrap { max-height: calc(100vh - 250px) !important; }
+  }
+  @media (min-width: 1400px) { .solo { max-width: 720px; } }
   .bar { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
   .fill { height: 100%; background: var(--accent); transition: width 0.4s ease; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
@@ -194,11 +203,11 @@
   .n.ok { color: var(--ok); }
   .n.bad { color: var(--danger); }
   .label2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
-  .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; max-height: 420px; overflow-y: auto; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; max-height: 60vh; overflow-y: auto; }
   table.data { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 12px; }
   table.data th, table.data td { text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--border); }
   table.data th { background: var(--surface-2); position: sticky; top: 0; }
-  .msg { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msg { max-width: 0; width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .st { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); }
   .st.sent { color: var(--ok); border-color: var(--ok); }
   .st.failed { color: var(--danger); border-color: var(--danger); }

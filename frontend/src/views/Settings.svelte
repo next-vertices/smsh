@@ -45,6 +45,8 @@
 <h1>Paramètres</h1>
 <p class="muted">Comptes OVH, stockage des clés et apparence.</p>
 
+<div class="settings">
+<div class="col-main">
 {#if error}<div class="alert error" role="alert">{error}</div>{/if}
 
 {#if editing}
@@ -77,6 +79,8 @@
   </div>
 {/if}
 
+</div>
+<div class="col-side">
 <div class="card">
   <h2>Apparence</h2>
   <div class="row">
@@ -92,6 +96,8 @@
     Les clés ne sont jamais écrites en clair sur le disque, ni envoyées à l'interface.
   </p>
 </div>
+</div>
+</div>
 
 {#if deleting}
   <Confirm title="Supprimer le compte" confirmLabel="Supprimer" danger {busy} onconfirm={confirmDelete} oncancel={() => (deleting = null)}>
@@ -101,6 +107,13 @@
 {/if}
 
 <style>
+  .settings { display: block; }
+  @media (min-width: 1280px) {
+    .settings { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 0 20px; align-items: start; }
+  }
+  @media (min-width: 1920px) {
+    .settings { grid-template-columns: minmax(0, 960px) 420px; }
+  }
   .acc { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid var(--border); }
   .acc:first-of-type { border-top: none; }
 </style>

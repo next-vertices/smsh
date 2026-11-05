@@ -109,6 +109,8 @@
 
 {#if error}<div class="alert error" role="alert">{error}</div>{/if}
 
+<div class="wz">
+<div class="wz-left">
 <div class="card">
   <h2>1. Destinataires</h2>
   <div class="row">
@@ -195,6 +197,8 @@
   </div>
 </div>
 
+</div>
+<div class="wz-right">
 {#if imp && template.trim()}
   <div class="card">
     <h2>3. Simulation <span class="muted small">(dry-run : rien n'est envoyé)</span></h2>
@@ -268,7 +272,11 @@
     <button onclick={oncancel}>Annuler</button>
     <button class="primary" disabled={!canLaunch} onclick={() => (confirming = true)}>Lancer la campagne…</button>
   </div>
+{:else}
+  <div class="card ph muted">La simulation (coût, aperçu, durée) apparaîtra ici une fois le fichier choisi et le message rédigé.</div>
 {/if}
+</div>
+</div>
 
 {#if confirming && report}
   <Confirm title="Lancer la campagne" confirmLabel="Lancer" busy={launching} onconfirm={launch} oncancel={() => (confirming = false)}>
@@ -284,6 +292,18 @@
 {/if}
 
 <style>
+  .wz { display: block; }
+  .ph { display: none; }
+  @media (min-width: 1280px) {
+    .wz { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 20px; align-items: start; }
+    .wz-right { position: sticky; top: 0; }
+    .ph { display: block; }
+  }
+  /* 27"-38" : fichier | message | simulation côte à côte */
+  @media (min-width: 2400px) {
+    .wz { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+    .wz-left { display: contents; }
+  }
   .disabled { opacity: 0.55; pointer-events: none; }
   .label2 { font-weight: 500; margin-bottom: 4px; }
   .check.off { opacity: 0.45; }

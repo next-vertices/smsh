@@ -113,7 +113,7 @@
   .acct { border-top: 1px solid var(--border); padding: 12px 10px 0; }
   .err { color: var(--danger); }
   main { flex: 1; overflow-y: auto; padding: 28px 32px; }
-  main > :global(*) { max-width: 920px; }
+
 
   /* Fenêtre étroite : barre latérale réduite */
   @media (max-width: 900px) {

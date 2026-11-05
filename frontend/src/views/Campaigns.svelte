@@ -41,7 +41,7 @@
 </script>
 
 {#if screen.name === 'new'}
-  <CampaignWizard oncancel={() => (screen = { name: 'list' })} onlaunched={launched} />
+  <div class="narrow"><CampaignWizard oncancel={() => (screen = { name: 'list' })} onlaunched={launched} /></div>
 {:else if screen.name === 'detail'}
   <CampaignDetail id={screen.id} onback={() => { refreshOverview(); screen = { name: 'list' } }} />
 {:else}
@@ -75,6 +75,9 @@
 {/if}
 
 <style>
+  .narrow { max-width: 920px; margin-inline: auto; }
+  @media (min-width: 1280px) { .narrow { max-width: 1500px; } }
+  @media (min-width: 2400px) { .narrow { max-width: none; margin-inline: 0; } }
   .item {
     display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
     background: none; border: none; border-bottom: 1px solid var(--border); border-radius: 0; padding: 12px 16px;
@@ -82,6 +85,7 @@
   .item:last-child { border-bottom: none; }
   .item:hover:not(:disabled) { background: var(--surface-2); }
   .prog { width: 160px; flex-shrink: 0; }
+  .item > .badge { min-width: 84px; text-align: center; flex-shrink: 0; }
   @media (max-width: 640px) {
     .item { flex-wrap: wrap; gap: 8px 12px; }
     .prog { order: 3; width: 100%; }

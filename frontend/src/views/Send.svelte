@@ -1,7 +1,8 @@
 <script lang="ts">
   import Confirm from '../components/Confirm.svelte'
-  import { api, ApiError, type Analysis, type CostEstimate, type Receivers, type SendOutcome } from '../lib/api'
+  import { api, ApiError, type Analysis, type CostEstimate, type HistoryItem, type Receivers, type SendOutcome } from '../lib/api'
   import { refreshOverview } from '../lib/actions'
+  import { dateFr } from '../lib/format'
   import { ui } from '../lib/state.svelte'
 
   let recipients = $state('')
@@ -124,6 +125,11 @@
     network: 'Réseau indisponible',
   }
   let lastKind = $state('')
+
+  // Derniers SMS (cache local de l'historique) : panneau affiché sur très grand écran.
+  let recent = $state<HistoryItem[]>([])
+  api.searchHistory({ query: '', receiver: '', status: '', sender: '', tag: '', dateFrom: '', dateTo: '' }, 0, 8)
+    .then((p) => (recent = p.items)).catch(() => {})
 </script>
 
 <svelte:window {onkeydown} />
@@ -131,6 +137,8 @@
 <h1>Envoyer un SMS</h1>
 <p class="muted">Envoi unitaire ou vers quelques numéros. <kbd>Ctrl</kbd>+<kbd>Entrée</kbd> pour envoyer.</p>
 
+<div class="send">
+<div class="left">
 {#if outcome}
   <div class="alert ok" role="status">
     <strong>{outcome.scheduled ? 'SMS programmé' : 'SMS envoyé'}</strong>
@@ -147,7 +155,7 @@
   <div class="alert error" role="alert"><strong>{errorTitle[lastKind] ?? "Échec de l'envoi"}</strong>{error}</div>
 {/if}
 
-<div class="card">
+<div class="card form">
   <div class="field">
     <label for="rcpt">Destinataire(s)</label>
     <textarea id="rcpt" rows="3" bind:value={recipients} placeholder="06 12 34 56 78&#10;+33 6 98 76 54 32"></textarea>
@@ -196,6 +204,18 @@
       <input id="stop" type="checkbox" bind:checked={stopClause} />
       Ajouter la mention « STOP » (SMS commercial)
     </label>
+  </div>
+</div>
+</div>
+<aside class="side">
+<div class="card">
+  <div class="label2">Aperçu</div>
+  <div class="phone">
+    <div class="bubble" class:empty={!message}>{message || 'Votre message apparaîtra ici…'}</div>
+    <div class="small muted meta">
+      {sender || 'Expéditeur par défaut'} → {validCount ? `${validCount} destinataire(s)` : 'aucun destinataire'}
+      {#if scheduled && sendAt}· le {new Date(sendAt).toLocaleString('fr-FR')}{/if}
+    </div>
   </div>
 
   {#if message.trim() && validCount}
@@ -252,6 +272,22 @@
     </button>
   </div>
 </div>
+</aside>
+
+<aside class="recent">
+  <div class="card">
+    <h2>Derniers SMS</h2>
+    {#each recent as h (h.id)}
+      <div class="rc">
+        <div class="row between"><span class="mono small">{h.receiver}</span><span class="small muted">{dateFr(h.createdAt)}</span></div>
+        <div class="small muted rcmsg">{h.message}</div>
+      </div>
+    {:else}
+      <p class="muted small" style="margin: 0">Aucun SMS en cache : synchronisez l'historique.</p>
+    {/each}
+  </div>
+</aside>
+</div>
 
 {#if confirming}
   <Confirm title="Confirmer l'envoi" confirmLabel={scheduled ? 'Programmer' : 'Envoyer'} busy={sending}
@@ -266,6 +302,32 @@
 {/if}
 
 <style>
+  .send { display: block; }
+  .recent { display: none; }
+  .label2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 8px; }
+  .phone { margin-bottom: 14px; }
+  .bubble {
+    background: var(--accent); color: var(--accent-text); border-radius: 16px 16px 16px 4px;
+    padding: 10px 14px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; width: fit-content; max-width: 100%;
+  }
+  .bubble.empty { background: var(--surface-2); color: var(--muted); }
+  .meta { margin-top: 6px; }
+  .rc { padding: 8px 0; border-top: 1px solid var(--border); }
+  .rc:first-of-type { border-top: none; }
+  .rcmsg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 17"-21" et au-delà : formulaire à gauche, coût + aperçu à droite (toujours visibles) */
+  @media (min-width: 1280px) {
+    .send { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 0 20px; align-items: start; }
+    .side { position: sticky; top: 0; }
+  }
+  @media (min-width: 1920px) {
+    .send { grid-template-columns: minmax(0, 820px) 460px; }
+  }
+  /* 27"-38" : troisième colonne avec les derniers envois */
+  @media (min-width: 2400px) {
+    .send { grid-template-columns: minmax(0, 860px) 480px minmax(320px, 560px); }
+    .recent { display: block; position: sticky; top: 0; }
+  }
   .counter { display: flex; gap: 14px; margin-top: 6px; font-size: 12px; color: var(--muted); align-items: center; flex-wrap: wrap; }
   .counter.warn { color: var(--warn); }
   blockquote {

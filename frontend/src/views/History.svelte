@@ -37,6 +37,16 @@
   let detail = $state<HistoryItem | null>(null)
   let searchEl: HTMLInputElement
 
+  // Grand écran : le détail s'affiche dans un panneau à droite (liste toujours visible).
+  let docked = $state(false)
+  $effect(() => {
+    const mq = window.matchMedia('(min-width: 2200px)')
+    docked = mq.matches
+    const on = (e: MediaQueryListEvent) => (docked = e.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  })
+
   const selCount = $derived(Object.keys(sel).length)
   const pageAllSelected = $derived(items.length > 0 && items.every((i) => sel[i.id]))
   const statusLabel: Record<string, string> = { delivered: 'Délivré', sent: 'Envoyé', scheduled: 'Programmé' }
@@ -183,6 +193,8 @@
 
 {#if error}<div class="alert error" role="alert">{error}</div>{/if}
 
+<div class="hpage">
+<aside class="hside">
 {#if progress && progress.total > 0}
   <div class="card" style="padding: 12px 16px">
     <div class="row between small"><span>Téléchargement des SMS (les plus récents d'abord)…</span>
@@ -210,7 +222,7 @@
 {/if}
 
 <div class="card filters">
-  <div class="grid3">
+  <div class="grid-auto">
     <div>
       <label for="hq">Recherche</label>
       <input id="hq" type="text" bind:this={searchEl} bind:value={q.query} placeholder="Message, numéro, expéditeur…" />
@@ -257,7 +269,8 @@
     <div style="margin-top: 10px"><button class="link" onclick={reset}>Réinitialiser les filtres</button></div>
   {/if}
 </div>
-
+</aside>
+<div class="hmain">
 <div class="row between" style="margin-bottom: 8px">
   <span class="muted small">
     {total} SMS · {credits} crédit(s){#if loading} · chargement…{/if}
@@ -278,31 +291,35 @@
   </div>
 {/if}
 
+<div class="hlayout" class:open={docked && detail}>
+<div class="hlist">
 <div class="card" style="padding: 0; overflow: hidden">
   <div class="tablewrap">
     <table class="hist">
       <thead>
         <tr>
           <th class="chk"><input type="checkbox" checked={pageAllSelected} onchange={togglePage} aria-label="Tout sélectionner" /></th>
-          <th>Date</th><th>Destinataire</th><th>Message</th><th>Exp.</th><th class="r">Seg.</th><th class="r">Cr.</th><th>Statut</th>
+          <th>Date</th><th>Destinataire</th><th>Message</th><th class="c-l">Campagne</th><th>Exp.</th><th class="c-xl">Délivré le</th><th class="r">Seg.</th><th class="r">Cr.</th><th>Statut</th>
         </tr>
       </thead>
       <tbody>
         {#each items as h (h.id)}
-          <tr class:picked={sel[h.id]} onclick={() => open(h)}>
+          <tr class:picked={sel[h.id]} class:current={detail?.id === h.id} onclick={() => open(h)}>
             <td class="chk" onclick={(e) => e.stopPropagation()}>
               <input type="checkbox" checked={!!sel[h.id]} onchange={() => toggle(h.id)} aria-label="Sélectionner le SMS {h.id}" />
             </td>
             <td class="nowrap">{dateFr(h.createdAt)}</td>
             <td class="mono nowrap">{h.receiver}</td>
             <td class="msg" title={h.message}>{h.message}</td>
+            <td class="c-l nowrap">{h.tag ? tagLabel(h.tag) : ''}</td>
             <td class="nowrap">{h.sender}</td>
+            <td class="c-xl nowrap">{h.deliveredAt ? dateFr(h.deliveredAt) : ''}</td>
             <td class="r">{h.parts}</td>
             <td class="r">{h.credits}</td>
             <td><span class="st {h.status}">{statusLabel[h.status] ?? h.status}</span></td>
           </tr>
         {:else}
-          <tr><td colspan="8" class="empty muted">
+          <tr><td colspan="10" class="empty muted">
             {#if loading}Chargement…{:else if filtered}Aucun SMS ne correspond à ces filtres.{:else}Aucun SMS en cache. Cliquez sur « Synchroniser ».{/if}
           </td></tr>
         {/each}
@@ -316,9 +333,29 @@
   </div>
 {/if}
 
-{#if detail}
-  {@const d = detail}
-  <Modal title="Détail du SMS" onclose={() => (detail = null)}>
+</div>
+{#if docked}{@render dockPanel()}{/if}
+</div>
+</div>
+</div>
+
+{#snippet dockPanel()}
+  {#if detail}
+    {@const d = detail}
+    <aside class="dock card">
+      <div class="row between" style="margin-bottom: 10px">
+        <h2 style="margin: 0">Détail du SMS</h2>
+        <button onclick={() => (detail = null)} aria-label="Fermer le détail">✕</button>
+      </div>
+      {@render detailBody(d)}
+      <div class="row" style="justify-content: flex-end; margin-top: 12px">
+        <button class="danger" onclick={() => (confirmIds = [d.id])}>Supprimer…</button>
+      </div>
+    </aside>
+  {/if}
+{/snippet}
+
+{#snippet detailBody(d: HistoryItem)}
     <dl>
       <dt>Destinataire</dt><dd class="mono">{d.receiver}</dd>
       <dt>Statut</dt><dd><span class="st {d.status}">{statusLabel[d.status] ?? d.status}</span></dd>
@@ -332,6 +369,12 @@
       <dt>Codes OVH</dt><dd class="mono small">accusé {d.receipt} · état {d.ptt}</dd>
     </dl>
     <blockquote>{d.message}</blockquote>
+    {/snippet}
+
+{#if detail && !docked}
+  {@const d = detail}
+  <Modal title="Détail du SMS" onclose={() => (detail = null)}>
+    {@render detailBody(d)}
     {#snippet actions()}
       <button class="danger" onclick={() => (confirmIds = [d.id])}>Supprimer…</button>
       <button class="primary" onclick={() => (detail = null)}>Fermer</button>
@@ -347,6 +390,29 @@
 {/if}
 
 <style>
+  .c-l, .c-xl { display: none; }
+  .hlayout { display: block; }
+  .dock { position: sticky; top: 0; }
+  tr.current { background: color-mix(in srgb, var(--accent) 18%, transparent) !important; }
+  .hpage { display: block; }
+  .hmain { min-width: 0; }
+  @media (min-width: 1900px) { .c-l { display: table-cell; } }
+  @media (min-width: 2400px) { .c-xl { display: table-cell; } }
+
+  /* >= 1600 px : filtres et état de synchronisation à gauche, tableau à droite */
+  @media (min-width: 1600px) {
+    .hpage { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 0 20px; align-items: start; }
+    .hside { position: sticky; top: 0; max-height: calc(100vh - 100px); overflow-y: auto; padding-right: 2px; }
+    .hside .grid-auto { grid-template-columns: 1fr 1fr; }
+    .hside .grid-auto > :nth-child(1), .hside .grid-auto > :nth-child(2),
+    .hside .grid-auto > :nth-child(3), .hside .grid-auto > :nth-child(6) { grid-column: 1 / -1; }
+    table.hist { min-width: 0 !important; }
+  }
+  /* >= 2200 px : détail du SMS dans un troisième panneau */
+  @media (min-width: 2200px) {
+    .hpage { grid-template-columns: 360px minmax(0, 1fr); }
+    .hlayout.open { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 0 16px; align-items: start; }
+  }
   .pbar { height: 8px; margin-top: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
   .pfill { height: 100%; background: var(--accent); transition: width 0.3s ease; }
   .tablewrap { overflow-x: auto; }
@@ -361,7 +427,7 @@
   .chk input { accent-color: var(--accent); }
   .r { text-align: right !important; }
   .nowrap { white-space: nowrap; }
-  .msg { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msg { max-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .empty { text-align: center !important; padding: 28px 10px !important; cursor: default; }
   .st { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
   .st.delivered { color: var(--ok); border-color: var(--ok); }
