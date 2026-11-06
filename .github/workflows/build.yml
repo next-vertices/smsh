@@ -1,0 +1,138 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  WAILS_VERSION: v2.17.1
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Dépendances système (Wails / GTK)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Go vet + tests
+        run: |
+          go vet -tags webkit2_41 ./...
+          go test -tags webkit2_41 ./...
+      - name: Vérification du front
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run check
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows, os: windows-latest }
+          - { name: linux, os: ubuntu-22.04 }
+          - { name: macos, os: macos-latest }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then V="${GITHUB_REF_NAME#v}"; else V="0.0.0-dev"; fi
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Installer Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}
+
+      # ---------- Windows ----------
+      - name: Build Windows
+        if: matrix.name == 'windows'
+        run: |
+          wails build -clean -platform windows/amd64 -ldflags "-s -w -X smsh/internal/cli.Version=${VERSION}"
+          mkdir dist
+          pwsh -c "Compress-Archive -Path build/bin/smsh.exe -DestinationPath dist/smsh_${VERSION}_windows_amd64.zip"
+
+      # ---------- Linux (deb / rpm / pacman / tar.gz) ----------
+      - name: Dépendances système (Wails / GTK)
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Build Linux
+        if: matrix.name == 'linux'
+        run: |
+          wails build -clean -platform linux/amd64 -tags webkit2_41 -ldflags "-s -w -X smsh/internal/cli.Version=${VERSION}"
+          mkdir dist
+          tar -C build/bin -czf "dist/smsh_${VERSION}_linux_amd64.tar.gz" smsh
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+          export ARCH=amd64
+          for fmt in deb rpm archlinux; do
+            nfpm package --config packaging/nfpm.yaml --packager "$fmt" --target dist/
+          done
+          ls -la dist
+
+      # ---------- macOS (binaire universel Intel + Apple Silicon) ----------
+      - name: Build macOS
+        if: matrix.name == 'macos'
+        run: |
+          wails build -clean -platform darwin/universal -ldflags "-s -w -X smsh/internal/cli.Version=${VERSION}"
+          mkdir dist
+          ditto -c -k --keepParent build/bin/smsh.app "dist/smsh_${VERSION}_macos_universal.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smsh-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publier la release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: smsh-*
+          merge-multiple: true
+      - name: Sommes de contrôle
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

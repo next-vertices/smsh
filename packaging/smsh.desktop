@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Smsh
+GenericName=Client SMS OVH
+Comment=Envoi et suivi de SMS via l'API OVH
+Exec=smsh
+Icon=smsh
+Terminal=false
+Categories=Utility;Network;
+Keywords=sms;ovh;campagne;

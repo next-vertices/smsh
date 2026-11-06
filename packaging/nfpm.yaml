@@ -1,0 +1,36 @@
+# Paquets Linux (deb, rpm, archlinux) générés par nfpm : VERSION et ARCH viennent de l'environnement.
+name: smsh
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: utils
+priority: optional
+maintainer: Smsh <noreply@next-vertices.invalid>
+description: |
+  Smsh : application de bureau pour piloter les API SMS d'OVH.
+  Envoi unitaire, campagnes CSV, historique ; interface graphique et ligne de commande
+  dans le même exécutable (smsh <commande>).
+homepage: https://github.com/next-vertices/smsh
+license: Proprietary
+contents:
+  - src: build/bin/smsh
+    dst: /usr/bin/smsh
+    file_info:
+      mode: 0755
+  - src: packaging/smsh.desktop
+    dst: /usr/share/applications/smsh.desktop
+  - src: build/appicon.png
+    dst: /usr/share/icons/hicolor/1024x1024/apps/smsh.png
+overrides:
+  deb:
+    depends:
+      - libgtk-3-0
+      - libwebkit2gtk-4.1-0
+  rpm:
+    depends:
+      - gtk3
+      - webkit2gtk4.1
+  archlinux:
+    depends:
+      - gtk3
+      - webkit2gtk-4.1

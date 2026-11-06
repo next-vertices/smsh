@@ -179,6 +179,21 @@ Principes :
 
 Le détecteur de concurrence (`-race`) nécessite un compilateur C ; il n'est pas utilisé ici.
 
+## Builds et publication (GitHub Actions)
+
+Le workflow [`.github/workflows/build.yml`](.github/workflows/build.yml) s'exécute à chaque push sur `main`, chaque pull request et sur demande : il lance `go vet`, `go test` et `npm run check`, puis compile sur trois systèmes (Wails dépend du moteur web du système : pas de compilation croisée).
+
+| Plateforme | Artefacts |
+|---|---|
+| Windows | `smsh_<version>_windows_amd64.zip` (contient `smsh.exe`) |
+| Linux (Debian/Ubuntu, Fedora, Arch/Manjaro…) | `.deb`, `.rpm`, `.pkg.tar.zst` (via nfpm, dépendances GTK 3 + WebKitGTK 4.1 déclarées) et `.tar.gz` du binaire |
+| macOS | `smsh_<version>_macos_universal.zip` (`smsh.app`, Intel + Apple Silicon) |
+
+- **Release** : poussez un tag `vX.Y.Z` (`git tag v1.0.0; git push origin v1.0.0`). Les artefacts sont publiés avec `SHA256SUMS.txt` et des notes générées. Le numéro de version est injecté dans `smsh --version`.
+- Hors tag, les binaires sont téléchargeables depuis l'onglet *Actions* de l'exécution (artefacts), version `0.0.0-dev`.
+- Linux : compilé sur Ubuntu 22.04 avec `-tags webkit2_41` ; il faut WebKitGTK 4.1 (Debian 12+, Ubuntu 22.04+, Fedora 38+, Arch à jour). Le paquet installe aussi l'entrée de menu et l'icône.
+- macOS : l'application n'est ni signée ni notarisée ; au premier lancement : clic droit > Ouvrir, ou `xattr -dr com.apple.quarantine smsh.app`. Windows peut afficher SmartScreen (exécutable non signé).
+
 ## Limites connues
 
 - **Statuts d'historique** déduits des dates (pas de statut « Échec » explicite d'OVH).
