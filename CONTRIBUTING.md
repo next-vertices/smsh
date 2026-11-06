@@ -60,6 +60,12 @@ Les PR de sécurité, ou qui touchent au coffre de clés, à l'envoi de SMS ou �
 
 Les versions sont créées par un tag `vX.Y.Z` sur `main` : la CI construit et publie les binaires. Voir la section « Builds et publication » du README.
 
-## Licence
+## Licence, droits et DCO
 
-En contribuant, vous acceptez que votre contribution soit publiée sous la licence du projet (voir le fichier `LICENSE`).
+Smsh est publié sous la licence du fichier `LICENSE` ([PolyForm Noncommercial 1.0.0](LICENSE) : code source disponible, **usage non commercial uniquement ; vente et usage commercial interdits sans accord de Next Vertices**). Le nom et le logo sont protégés : voir [TRADEMARKS.md](TRADEMARKS.md).
+
+En ouvrant une PR, vous certifiez, selon le [Developer Certificate of Origin](https://developercertificate.org/), que vous avez le droit de soumettre ce code, et vous **accordez à Next Vertices une licence perpétuelle, mondiale et non exclusive pour l'utiliser, le modifier et le distribuer**, y compris sous une autre licence à l'avenir. Vous en gardez la propriété.
+
+Chaque commit doit être signé de cette façon : `git commit -s` (ajoute `Signed-off-by: Prénom Nom <email>`).
+
+Les forks sont autorisés pour proposer des contributions, pas pour diffuser une version concurrente.

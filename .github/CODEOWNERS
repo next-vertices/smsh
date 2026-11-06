@@ -1,0 +1,12 @@
+# Relecteurs automatiques. L'équipe doit exister dans l'organisation (Settings > Teams) avec accès en écriture.
+# Activer « Require review from Code Owners » dans le ruleset de main pour que ce soit obligatoire.
+*                        @next-vertices/maintainers
+
+# Zones sensibles : secrets, envoi de SMS, suppression chez OVH, publication
+/internal/creds/         @next-vertices/maintainers
+/internal/ovh/           @next-vertices/maintainers
+/internal/campaign/      @next-vertices/maintainers
+/internal/service/       @next-vertices/maintainers
+/.github/                @next-vertices/maintainers
+/packaging/              @next-vertices/maintainers
+/LICENSE                 @next-vertices/maintainers

@@ -8,6 +8,8 @@ Outil privé, **GUI d'abord** : tout se fait depuis l'interface, y compris la co
 - Cible principale **Windows 10/11** ; code portable Linux et macOS.
 - Clés OVH stockées dans le **coffre du système**, jamais en clair sur disque, ni dans les logs, ni renvoyées à l'interface.
 
+> **Sources officielles** : uniquement le dépôt <https://github.com/next-vertices/smsh> et les sites de Next Vertices. Tout autre binaire ou paquet est non officiel (voir [TRADEMARKS.md](TRADEMARKS.md)). Les contributions sont les bienvenues (voir [CONTRIBUTING.md](CONTRIBUTING.md)).
+
 ## Fonctionnalités
 
 | Domaine | État | Détail |
@@ -207,3 +209,7 @@ Le workflow [`.github/workflows/build.yml`](.github/workflows/build.yml) s'exéc
 - [ ] Export CSV (campagnes, historique) depuis les Paramètres
 - [x] CLI : `send`, `ls`, `rm`, `sync`, `status`, `account`, `campaign`, sortie `--json`
 - [ ] Statut d'échec explicite dans l'historique (selon les codes OVH réels)
+
+## Licence
+
+Code sous licence [PolyForm Noncommercial 1.0.0](LICENSE) : vous pouvez l'utiliser, l'étudier, le modifier et proposer des contributions pour un usage **non commercial**. La **vente**, l'usage commercial et la diffusion d'une version concurrente sont interdits sans l'accord de Next Vertices. Le nom « Smsh » et le logo sont réservés (voir [TRADEMARKS.md](TRADEMARKS.md)) ; les seules sources officielles sont celles de Next Vertices.

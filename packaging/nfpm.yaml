@@ -11,7 +11,7 @@ description: |
   Envoi unitaire, campagnes CSV, historique ; interface graphique et ligne de commande
   dans le même exécutable (smsh <commande>).
 homepage: https://github.com/next-vertices/smsh
-license: Proprietary
+license: PolyForm-Noncommercial-1.0.0
 contents:
   - src: build/bin/smsh
     dst: /usr/bin/smsh
