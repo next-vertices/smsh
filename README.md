@@ -56,25 +56,50 @@ Un message contenant des variables impose le mode Personnalisé.
 
 ### Prérequis
 - [Go](https://go.dev/dl/) 1.26+
-- [Node.js](https://nodejs.org/) 20+ et npm
-- WebView2 (déjà présent sur Windows 10/11)
-- CLI Wails : `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+- [Node.js](https://nodejs.org/) 22+ et npm
+- CLI Wails v2 : `go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.1`
+- Dépendances système, selon la plateforme :
 
-### Commandes
+| Plateforme | À installer |
+|---|---|
+| Windows 10/11 | WebView2 (déjà présent) ; un terminal PowerShell |
+| Debian / Ubuntu | `sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev` |
+| Fedora | `sudo dnf install gcc-c++ pkgconf-pkg-config gtk3-devel webkit2gtk4.1-devel` |
+| Arch / Manjaro | `sudo pacman -S base-devel gtk3 webkit2gtk-4.1` |
+| macOS | outils de ligne de commande Xcode : `xcode-select --install` |
+
+Lancez `wails doctor` pour vérifier que tout est en place.
+
+### Développer
 
 ```powershell
-# Développement avec rechargement à chaud
-wails dev
-
-# Build de production (binaire léger) -> build\bin\smsh.exe
-wails build -ldflags "-s -w"
-
-# Tests Go
-go test ./...
-
-# Vérification du front
-cd frontend; npm run check
+wails dev                 # rechargement à chaud (Linux : ajouter -tags webkit2_41)
+go test ./...             # tests Go
+cd frontend; npm install; npm run check   # types Svelte + cohérence des traductions
 ```
+
+### Compiler
+
+Un seul exécutable sert d'application et de ligne de commande. Le résultat est dans `build/bin/`.
+
+| Plateforme | Commande | Résultat |
+|---|---|---|
+| Windows | `wails build -ldflags "-s -w"` | `build\bin\smsh.exe` |
+| Linux | `wails build -tags webkit2_41 -ldflags "-s -w"` | `build/bin/smsh` |
+| macOS | `wails build -platform darwin/universal -ldflags "-s -w"` | `build/bin/smsh.app` (Intel + Apple Silicon) |
+
+- `wails build` compile d'abord le front (`npm install` + `npm run build`), puis le binaire Go. Aucune étape manuelle.
+- Pas de compilation croisée : le moteur web dépend du système, chaque plateforme se compile sur elle-même (la CI de GitHub s'en charge, voir plus bas).
+- `-ldflags "-s -w"` allège le binaire. Pour y inscrire un numéro de version affiché par `smsh --version` :
+  `wails build -ldflags "-s -w -X smsh/internal/cli.Version=1.2.3"`.
+- Nettoyer avant de recompiler : ajouter `-clean`.
+- Linux : `-tags webkit2_41` est nécessaire avec WebKitGTK 4.1 (Debian 12+, Ubuntu 22.04+, Fedora 38+, Arch). Avec l'ancienne WebKitGTK 4.0, retirer ce tag.
+- Binaire seul sans l'interface (`go build ./...` suffit pour vérifier la compilation Go) : `main.go` embarque `frontend/dist`, compilez donc le front avant (`cd frontend; npm run build`).
+
+**Dépannage**
+- `no matching files found` pour `frontend/dist` : le front n'est pas compilé. Lancez `cd frontend; npm install; npm run build`, ou `wails build`.
+- Windows, « le fichier est utilisé par un autre processus » pendant la compilation : un antivirus ou une instance de `smsh.exe` ouverte. Fermez l'application, relancez, ou excluez le dossier du projet et `%TEMP%` de l'antivirus.
+- `Package gtk+-3.0 was not found` (Linux) : installez les paquets du tableau ci-dessus.
 
 ### Mode démo (sans compte OVH)
 Un faux OVH et un coffre en mémoire remplacent l'API : l'onboarding accepte n'importe quelles valeurs, et tout est simulé. Rien n'est écrit dans votre configuration.
