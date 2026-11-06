@@ -9,18 +9,20 @@
   import { api } from './lib/api'
   import { refreshAll } from './lib/actions'
   import { setTheme, ui, type View } from './lib/state.svelte'
+  import { initLanguage, t } from './lib/i18n.svelte'
 
-  const nav: { id: View; label: string }[] = [
-    { id: 'send', label: 'Envoyer' },
-    { id: 'campaigns', label: 'Campagnes' },
-    { id: 'history', label: 'Historique' },
-    { id: 'settings', label: 'Paramètres' },
+  const nav: { id: View; label: () => string }[] = [
+    { id: 'send', label: () => t('nav.send') },
+    { id: 'campaigns', label: () => t('nav.campaigns') },
+    { id: 'history', label: () => t('nav.history') },
+    { id: 'settings', label: () => t('nav.settings') },
   ]
 
   let fatal = $state('')
 
   onMount(async () => {
     setTheme(ui.theme)
+    await initLanguage(api.systemLanguage, api.setLanguage)
     try {
       ui.status = await api.status()
       // Coffre à passphrase : déverrouillage via la modale (déclenché par l'appel suivant).
@@ -56,36 +58,36 @@
 <svelte:window {onkeydown} />
 
 {#if !ui.ready}
-  <div class="center muted">Chargement…</div>
+  <div class="center muted">{t('app.loading')}</div>
 {:else if fatal}
   <div class="center"><div class="alert error">{fatal}</div></div>
 {:else if ui.accounts.length === 0 && !ui.unlock}
   <Onboarding />
 {:else}
   <div class="shell">
-    <nav aria-label="Navigation principale">
+    <nav aria-label={t('nav.aria')}>
       <div class="brand"><span class="logo">S</span>Smsh</div>
       {#each nav as n, i}
         <button class="item" class:current={ui.view === n.id} onclick={() => (ui.view = n.id)} aria-current={ui.view === n.id ? 'page' : undefined}>
-          <span class="lab"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html icons[n.id] ?? ''}</svg>{n.label}</span><kbd>Ctrl+{i + 1}</kbd>
+          <span class="lab"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html icons[n.id] ?? ''}</svg>{n.label()}</span><kbd>Ctrl+{i + 1}</kbd>
         </button>
       {/each}
       <div class="grow"></div>
       {#if active}
         <div class="acct">
-          <div class="small muted lbl">Compte actif</div>
+          <div class="small muted lbl">{t('app.active_account')}</div>
           <strong><span class="dot" class:bad={!!ui.overviewError}></span>{active.name}</strong>
           {#if ui.overview}
-            <div class="small lbl2">{ui.overview.creditsLeft} crédit(s)</div>
+            <div class="small lbl2">{t('app.credits_left', { count: ui.overview.creditsLeft })}</div>
           {:else if ui.overviewError}
-            <div class="small err" title={ui.overviewError}>Connexion impossible</div>
+            <div class="small err" title={ui.overviewError}>{t('app.connection_failed')}</div>
           {/if}
         </div>
       {/if}
     </nav>
     <main>
       {#if ui.overviewError}
-        <div class="alert error" role="alert"><strong>Compte « {active?.name} » inaccessible</strong>{ui.overviewError}</div>
+        <div class="alert error" role="alert"><strong>{t('app.account_unreachable', { name: active?.name })}</strong>{ui.overviewError}</div>
       {/if}
       {#if ui.view === 'send'}
         <Send />

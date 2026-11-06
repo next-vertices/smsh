@@ -59,11 +59,15 @@ export function Send(arg1:service.SendInput):Promise<service.SendOutcome>;
 
 export function SetActiveAccount(arg1:string):Promise<void>;
 
+export function SetLanguage(arg1:string):Promise<string>;
+
 export function SimulateCampaign(arg1:service.PlanInput):Promise<service.PlanReport>;
 
 export function Status():Promise<creds.Status>;
 
 export function SyncHistory(arg1:number):Promise<service.SyncResult>;
+
+export function SystemLanguage():Promise<string>;
 
 export function TestConnection(arg1:creds.Input):Promise<service.ServiceInfo>;
 

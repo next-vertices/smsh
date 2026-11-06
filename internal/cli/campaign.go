@@ -11,25 +11,24 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"smsh/internal/i18n"
 	"smsh/internal/service"
 	"smsh/internal/store"
 )
 
-var campStatusLabel = map[string]string{
-	store.StatusPending: "en attente", store.StatusRunning: "en cours", store.StatusPaused: "en pause",
-	store.StatusCompleted: "terminée", store.StatusCanceled: "annulée", store.StatusFailed: "échec",
+func campStatusLabel(s string) string {
+	switch s {
+	case store.StatusPending, store.StatusRunning, store.StatusPaused, store.StatusCompleted, store.StatusCanceled, store.StatusFailed:
+		return i18n.T("cli.cs_" + s)
+	}
+	return s
 }
 
 func campaignCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "campaign",
-		Short: "Campagnes SMS à partir d'un fichier CSV",
-		Long: `Campagnes SMS à partir d'un fichier CSV.
-
-Deux modes :
-  batch  même message pour tous, traité côté OVH (continue si vous fermez le terminal) ;
-  local  un SMS par destinataire (variables {colonne}), débit limité, exécuté par ce processus :
-         Ctrl-C met la campagne en pause, « smsh campaign resume <id> » la reprend.`,
+		Short: i18n.T("cli.camp_short"),
+		Long:  i18n.T("cli.camp_long"),
 	}
 	c.AddCommand(campRunCmd(), campLsCmd(), campShowCmd(), campResumeCmd(), campCancelCmd(), campRetryCmd(), campRmCmd())
 	return c
@@ -44,14 +43,12 @@ func campRunCmd() *cobra.Command {
 		stop, yes, dry, wait                         bool
 	)
 	c := &cobra.Command{
-		Use:   "run <fichier.csv>",
-		Short: "Simule puis lance une campagne",
-		Example: `  smsh campaign run contacts.csv -m "Bonjour {prenom}, rendez-vous demain." --dry-run
-  smsh campaign run contacts.csv -f message.txt --name "Relance" --phone-col telephone --yes
-  smsh campaign run liste.csv -m "Promo -20%" --mode batch --at "2026-11-10 09:00" --stop --yes`,
+		Use:     i18n.T("cli.run_usage"),
+		Short:   i18n.T("cli.run_short"),
+		Example: i18n.T("cli.run_example"),
 		Args: func(_ *cobra.Command, args []string) error {
 			if len(args) != 1 {
-				return usagef("indiquez le fichier CSV : smsh campaign run <fichier.csv> -m \"message\"")
+				return usagef("%s", i18n.T("cli.run_need_file"))
 			}
 			return nil
 		},
@@ -61,7 +58,7 @@ func campRunCmd() *cobra.Command {
 				return err
 			}
 			if mode != "" && mode != store.ModeBatch && mode != store.ModeLocal {
-				return usagef("--mode : %q ou %q", store.ModeBatch, store.ModeLocal)
+				return usagef("%s", i18n.T("cli.bad_mode", i18n.P{"a": fmt.Sprintf("%q", store.ModeBatch), "b": fmt.Sprintf("%q", store.ModeLocal)}))
 			}
 			return withService(func(ctx context.Context, svc *service.Service) error {
 				info, err := svc.ImportCSV(args[0])
@@ -86,20 +83,20 @@ func campRunCmd() *cobra.Command {
 					if asJSON {
 						printJSON(os.Stdout, map[string]any{"dryRun": dry, "report": rep})
 					}
-					return failf("simulation bloquée : %s", strings.Join(rep.Blocking, " "))
+					return failf("%s", i18n.T("cli.sim_blocked", i18n.P{"reasons": strings.Join(rep.Blocking, " ")}))
 				}
 				if dry {
 					if asJSON {
 						printJSON(os.Stdout, map[string]any{"dryRun": true, "report": rep})
 					} else {
-						fmt.Fprintln(os.Stderr, "Simulation : rien n'a été envoyé.")
+						fmt.Fprintln(os.Stderr, i18n.T("cli.dry_done"))
 					}
 					return nil
 				}
 				if name == "" {
 					name = strings.TrimSuffix(info.File, fileExt(info.File))
 				}
-				if err := confirm(fmt.Sprintf("Lancer la campagne « %s » (%d SMS, mode %s) ?", name, rep.Recipients, rep.Mode), yes); err != nil {
+				if err := confirm(i18n.T("cli.run_confirm", i18n.P{"name": name, "count": rep.Recipients, "mode": rep.Mode}), yes); err != nil {
 					return err
 				}
 				lctx, lcancel := context.WithTimeout(ctx, 2*time.Minute)
@@ -112,7 +109,7 @@ func campRunCmd() *cobra.Command {
 					if asJSON {
 						printJSON(os.Stdout, camp)
 					} else {
-						fmt.Printf("Campagne « %s » créée (batch OVH %s). Suivi : smsh campaign show %s\n", camp.Name, camp.BatchID, camp.ID)
+						fmt.Println(i18n.T("cli.run_created", i18n.P{"name": camp.Name, "batch": camp.BatchID, "id": camp.ID}))
 					}
 					return nil
 				}
@@ -125,18 +122,18 @@ func campRunCmd() *cobra.Command {
 		},
 	}
 	f := c.Flags()
-	f.StringVarP(&message, "message", "m", "", "modèle du message, variables {colonne}")
-	f.StringVarP(&file, "file", "f", "", "lire le modèle dans un fichier (« - » : entrée standard)")
-	f.StringVar(&name, "name", "", "nom de la campagne (défaut : nom du fichier)")
-	f.StringVar(&phone, "phone-col", "", "colonne des numéros : nom d'en-tête ou position (1 = première) ; détectée par défaut")
-	f.StringVar(&mode, "mode", "", "batch | local (défaut : batch, ou local si le modèle a des variables)")
-	f.Float64Var(&rate, "rate", 3, "débit en SMS/seconde (mode local)")
-	f.StringVar(&sender, "sender", "", "expéditeur (vide : numéro court par défaut)")
-	f.StringVar(&at, "at", "", "envoi différé : « 2026-11-10 09:00 » (heure locale) ou RFC 3339")
-	f.BoolVar(&stop, "stop", false, "ajouter la mention STOP (SMS commercial)")
-	f.BoolVarP(&yes, "yes", "y", false, "ne pas demander de confirmation")
-	f.BoolVar(&dry, "dry-run", false, "simuler seulement (rien n'est envoyé)")
-	f.BoolVar(&wait, "wait", false, "mode batch : attendre la fin de l'envoi")
+	f.StringVarP(&message, "message", "m", "", i18n.T("cli.fl_template"))
+	f.StringVarP(&file, "file", "f", "", i18n.T("cli.fl_template_file"))
+	f.StringVar(&name, "name", "", i18n.T("cli.fl_name"))
+	f.StringVar(&phone, "phone-col", "", i18n.T("cli.fl_phone_col"))
+	f.StringVar(&mode, "mode", "", i18n.T("cli.fl_mode"))
+	f.Float64Var(&rate, "rate", 3, i18n.T("cli.fl_rate"))
+	f.StringVar(&sender, "sender", "", i18n.T("cli.fl_sender"))
+	f.StringVar(&at, "at", "", i18n.T("cli.fl_at_camp"))
+	f.BoolVar(&stop, "stop", false, i18n.T("cli.fl_stop"))
+	f.BoolVarP(&yes, "yes", "y", false, i18n.T("cli.fl_yes"))
+	f.BoolVar(&dry, "dry-run", false, i18n.T("cli.fl_dry_camp"))
+	f.BoolVar(&wait, "wait", false, i18n.T("cli.fl_wait"))
 	return c
 }
 
@@ -150,7 +147,7 @@ func fileExt(name string) string {
 func phoneColumn(info service.ImportInfo, spec string) (int, error) {
 	if spec == "" {
 		if info.PhoneColumn < 0 {
-			return 0, usagef("colonne des numéros non détectée : précisez --phone-col (en-têtes : %s)", strings.Join(info.Headers, ", "))
+			return 0, usagef("%s", i18n.T("cli.col_not_detected", i18n.P{"headers": strings.Join(info.Headers, ", ")}))
 		}
 		return info.PhoneColumn, nil
 	}
@@ -162,35 +159,35 @@ func phoneColumn(info service.ImportInfo, spec string) (int, error) {
 	if n, err := strconv.Atoi(spec); err == nil && n >= 1 && n <= len(info.Headers) {
 		return n - 1, nil
 	}
-	return 0, usagef("colonne introuvable : %q (en-têtes : %s)", spec, strings.Join(info.Headers, ", "))
+	return 0, usagef("%s", i18n.T("cli.col_not_found", i18n.P{"spec": fmt.Sprintf("%q", spec), "headers": strings.Join(info.Headers, ", ")}))
 }
 
 func printReport(info service.ImportInfo, r service.PlanReport) {
 	w := os.Stderr
-	fmt.Fprintf(w, "Fichier       : %s (%d ligne(s))\n", info.File, info.Rows)
-	fmt.Fprintf(w, "Destinataires : %d valide(s)", r.Recipients)
+	fmt.Fprintln(w, i18n.T("cli.r_file", i18n.P{"file": info.File, "count": info.Rows}))
+	fmt.Fprint(w, i18n.T("cli.r_recipients", i18n.P{"count": r.Recipients}))
 	if r.InvalidCount > 0 {
-		fmt.Fprintf(w, ", %d invalide(s)", r.InvalidCount)
+		fmt.Fprint(w, i18n.T("cli.r_invalid", i18n.P{"count": r.InvalidCount}))
 	}
 	if r.Dupes > 0 {
-		fmt.Fprintf(w, ", %d doublon(s) ignoré(s)", r.Dupes)
+		fmt.Fprint(w, i18n.T("cli.r_dupes", i18n.P{"count": r.Dupes}))
 	}
-	fmt.Fprintf(w, "\nMode          : %s", r.Mode)
+	fmt.Fprint(w, "\n"+i18n.T("cli.r_mode", i18n.P{"mode": r.Mode}))
 	if len(r.Variables) > 0 {
-		fmt.Fprintf(w, " (variables : %s)", strings.Join(r.Variables, ", "))
+		fmt.Fprint(w, i18n.T("cli.r_variables", i18n.P{"names": strings.Join(r.Variables, ", ")}))
 	}
-	fmt.Fprintf(w, "\nSegments      : %d au total (max %d par SMS)\n", r.TotalParts, r.MaxParts)
+	fmt.Fprintln(w, "\n"+i18n.T("cli.r_segments", i18n.P{"total": r.TotalParts, "max": r.MaxParts}))
 	if r.TotalCredits > 0 {
-		fmt.Fprintf(w, "Coût estimé   : %v crédit(s) ≈ %s HT\n", r.TotalCredits, euro(r.PriceMin, r.PriceMax, r.Currency))
+		fmt.Fprintln(w, i18n.T("cli.r_cost", i18n.P{"credits": r.TotalCredits, "price": euro(r.PriceMin, r.PriceMax, r.Currency)}))
 	}
 	if r.DurationSeconds >= 1 {
-		fmt.Fprintf(w, "Durée estimée : %s\n", time.Duration(r.DurationSeconds*float64(time.Second)).Round(time.Second))
+		fmt.Fprintln(w, i18n.T("cli.r_duration", i18n.P{"d": time.Duration(r.DurationSeconds * float64(time.Second)).Round(time.Second)}))
 	}
 	for _, s := range r.Samples[:min(len(r.Samples), 2)] {
-		fmt.Fprintf(w, "Aperçu        : %s → %s\n", s.Phone, trunc(s.Message, 80))
+		fmt.Fprintln(w, i18n.T("cli.r_sample", i18n.P{"phone": s.Phone, "msg": trunc(s.Message, 80)}))
 	}
 	for _, i := range r.Invalid[:min(len(r.Invalid), 5)] {
-		fmt.Fprintf(w, "  ! ligne %d : « %s » ignorée\n", i.Line, i.Value)
+		fmt.Fprintln(w, i18n.T("cli.r_ignored", i18n.P{"line": i.Line, "value": i.Value}))
 	}
 	for _, x := range r.Warnings {
 		fmt.Fprintln(w, "  ! "+x)
@@ -215,7 +212,7 @@ func follow(ctx context.Context, svc *service.Service, c store.Campaign) (store.
 		if asJSON {
 			return
 		}
-		line := fmt.Sprintf("%s : %d/%d envoyés, %d échec(s) — %s", c.Name, c.Sent, c.Total, c.Failed, campStatusLabel[c.Status])
+		line := i18n.T("cli.follow_line", i18n.P{"name": c.Name, "sent": c.Sent, "total": c.Total, "failed": c.Failed, "status": campStatusLabel(c.Status)})
 		if tty {
 			fmt.Fprintf(os.Stderr, "\r%-100s", line)
 		} else if time.Since(last) > 5*time.Second {
@@ -250,7 +247,7 @@ func follow(ctx context.Context, svc *service.Service, c store.Campaign) (store.
 				fmt.Fprintln(os.Stderr)
 			}
 			if interrupted {
-				return final, failf("interrompu : campagne en pause, reprenez avec « smsh campaign resume %s »", c.ID)
+				return final, failf("%s", i18n.T("cli.follow_interrupted", i18n.P{"id": c.ID}))
 			}
 			return final, nil
 		case <-tick.C:
@@ -272,19 +269,18 @@ func finishErr(c store.Campaign, err error) error {
 		return err
 	}
 	if !asJSON {
-		fmt.Printf("Campagne « %s » : %s — %d/%d envoyés, %d échec(s), %v crédit(s).\n",
-			c.Name, campStatusLabel[c.Status], c.Sent, c.Total, c.Failed, c.Credits)
+		fmt.Println(i18n.T("cli.finish_line", i18n.P{"name": c.Name, "status": campStatusLabel(c.Status), "sent": c.Sent, "total": c.Total, "failed": c.Failed, "credits": c.Credits}))
 		if c.Error != "" {
 			fmt.Fprintln(os.Stderr, "  ! "+c.Error)
 		}
 	}
 	switch {
 	case c.Status == store.StatusPaused:
-		return failf("campagne en pause : %s (reprise : smsh campaign resume %s)", orDefault(c.Error, "voir les détails"), c.ID)
+		return failf("%s", i18n.T("cli.finish_paused", i18n.P{"detail": orDefault(c.Error, i18n.T("cli.see_details")), "id": c.ID}))
 	case c.Status == store.StatusFailed:
-		return failf("campagne en échec : %s", c.Error)
+		return failf("%s", i18n.T("cli.finish_failed", i18n.P{"error": c.Error}))
 	case c.Failed > 0:
-		return failf("%d destinataire(s) en échec (relance : smsh campaign retry %s)", c.Failed, c.ID)
+		return failf("%s", i18n.T("cli.finish_n_failed", i18n.P{"count": c.Failed, "id": c.ID}))
 	}
 	return nil
 }
@@ -301,7 +297,7 @@ func orDefault(s, d string) string {
 func campLsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "ls",
-		Short: "Liste les campagnes",
+		Short: i18n.T("cli.camp_ls_short"),
 		Args:  exactly(0),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return withService(func(ctx context.Context, svc *service.Service) error {
@@ -314,10 +310,10 @@ func campLsCmd() *cobra.Command {
 					return nil
 				}
 				tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-				fmt.Fprintln(tw, "ID\tNOM\tMODE\tSTATUT\tENVOYÉS\tÉCHECS\tCRÉDITS\tCRÉÉE")
+				fmt.Fprintln(tw, i18n.T("cli.th_camp"))
 				for _, c := range list {
 					fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d/%d\t%d\t%v\t%s\n", c.ID, trunc(c.Name, 30), c.Mode,
-						campStatusLabel[c.Status], c.Sent, c.Total, c.Failed, c.Credits, dateFr(c.CreatedAt))
+						campStatusLabel(c.Status), c.Sent, c.Total, c.Failed, c.Credits, dateFr(c.CreatedAt))
 				}
 				return tw.Flush()
 			})
@@ -331,7 +327,7 @@ func campShowCmd() *cobra.Command {
 	var limit int
 	c := &cobra.Command{
 		Use:   "show <id>",
-		Short: "Détail d'une campagne (--recipients : liste des destinataires)",
+		Short: i18n.T("cli.show_short"),
 		Args:  exactly(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(ctx context.Context, svc *service.Service) error {
@@ -349,31 +345,31 @@ func campShowCmd() *cobra.Command {
 					printJSON(os.Stdout, map[string]any{"campaign": camp, "recipients": page})
 					return nil
 				}
-				fmt.Printf("Nom      : %s\nID       : %s\nMode     : %s\nStatut   : %s\n", camp.Name, camp.ID, camp.Mode, campStatusLabel[camp.Status])
-				fmt.Printf("Envoyés  : %d/%d (%d échec(s))\nCrédits  : %v\nCréée    : %s\n", camp.Sent, camp.Total, camp.Failed, camp.Credits, dateFr(camp.CreatedAt))
+				fmt.Print(i18n.T("cli.show_a", i18n.P{"name": camp.Name, "id": camp.ID, "mode": camp.Mode, "status": campStatusLabel(camp.Status)}))
+				fmt.Print(i18n.T("cli.show_b", i18n.P{"sent": camp.Sent, "total": camp.Total, "failed": camp.Failed, "credits": camp.Credits, "created": dateFr(camp.CreatedAt)}))
 				if camp.SendAt != nil {
-					fmt.Printf("Envoi    : %s\n", dateFr(*camp.SendAt))
+					fmt.Print(i18n.T("cli.show_sendat", i18n.P{"date": dateFr(*camp.SendAt)}))
 				}
-				fmt.Printf("Message  : %s\n", trunc(camp.Template, 120))
+				fmt.Print(i18n.T("cli.show_msg", i18n.P{"v": trunc(camp.Template, 120)}))
 				if camp.Error != "" {
-					fmt.Printf("Erreur   : %s\n", camp.Error)
+					fmt.Print(i18n.T("cli.show_err", i18n.P{"v": camp.Error}))
 				}
 				if recipients {
 					tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-					fmt.Fprintln(tw, "\nN°\tNUMÉRO\tSTATUT\tDÉTAIL")
+					fmt.Fprintln(tw, i18n.T("cli.th_recipients"))
 					for _, r := range page.Items {
 						fmt.Fprintf(tw, "%d\t%s\t%s\t%s\n", r.Idx+1, r.Phone, r.Status, trunc(r.Error, 80))
 					}
 					_ = tw.Flush()
-					fmt.Fprintf(os.Stderr, "%d affiché(s) sur %d\n", len(page.Items), page.Total)
+					fmt.Fprintln(os.Stderr, i18n.T("cli.show_footer", i18n.P{"shown": len(page.Items), "total": page.Total}))
 				}
 				return nil
 			})
 		},
 	}
-	c.Flags().BoolVar(&recipients, "recipients", false, "lister les destinataires (campagnes en mode local)")
-	c.Flags().StringVar(&status, "status", "", "filtrer : pending | sent | failed")
-	c.Flags().IntVarP(&limit, "limit", "n", 50, "nombre de destinataires")
+	c.Flags().BoolVar(&recipients, "recipients", false, i18n.T("cli.fl_recipients"))
+	c.Flags().StringVar(&status, "status", "", i18n.T("cli.fl_status_filter"))
+	c.Flags().IntVarP(&limit, "limit", "n", 50, i18n.T("cli.fl_limit_recipients"))
 	return c
 }
 
@@ -382,7 +378,7 @@ func campShowCmd() *cobra.Command {
 func campResumeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "resume <id>",
-		Short: "Reprend une campagne locale en pause (exécutée dans ce terminal)",
+		Short: i18n.T("cli.resume_short"),
 		Args:  exactly(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(ctx context.Context, svc *service.Service) error {
@@ -391,7 +387,7 @@ func campResumeCmd() *cobra.Command {
 					return err
 				}
 				if camp.Mode != store.ModeLocal {
-					return failf("seules les campagnes en mode local peuvent être reprises")
+					return failf("%s", i18n.T("cli.resume_local_only"))
 				}
 				if err := svc.ResumeCampaign(ctx, camp.ID); err != nil {
 					return err
@@ -409,7 +405,7 @@ func campResumeCmd() *cobra.Command {
 func campRetryCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "retry <id>",
-		Short: "Relance les destinataires en échec d'une campagne locale",
+		Short: i18n.T("cli.retry_short"),
 		Args:  exactly(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(ctx context.Context, svc *service.Service) error {
@@ -418,7 +414,7 @@ func campRetryCmd() *cobra.Command {
 					return err
 				}
 				if n == 0 {
-					fmt.Println("Aucun destinataire en échec.")
+					fmt.Println(i18n.T("cli.retry_none"))
 					return nil
 				}
 				camp, err := svc.GetCampaign(ctx, args[0])
@@ -439,10 +435,10 @@ func campCancelCmd() *cobra.Command {
 	var yes bool
 	c := &cobra.Command{
 		Use:   "cancel <id>",
-		Short: "Annule une campagne (batch différé : annulation côté OVH)",
+		Short: i18n.T("cli.cancel_short"),
 		Args:  exactly(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := confirm("Annuler cette campagne ?", yes); err != nil {
+			if err := confirm(i18n.T("cli.cancel_confirm"), yes); err != nil {
 				return err
 			}
 			return withService(func(ctx context.Context, svc *service.Service) error {
@@ -452,13 +448,13 @@ func campCancelCmd() *cobra.Command {
 				if asJSON {
 					printJSON(os.Stdout, map[string]string{"canceled": args[0]})
 				} else {
-					fmt.Println("Campagne annulée.")
+					fmt.Println(i18n.T("cli.cancel_done"))
 				}
 				return nil
 			})
 		},
 	}
-	c.Flags().BoolVarP(&yes, "yes", "y", false, "ne pas demander de confirmation")
+	c.Flags().BoolVarP(&yes, "yes", "y", false, i18n.T("cli.fl_yes"))
 	return c
 }
 
@@ -466,10 +462,10 @@ func campRmCmd() *cobra.Command {
 	var yes bool
 	c := &cobra.Command{
 		Use:   "rm <id>",
-		Short: "Supprime une campagne de l'historique local (rien n'est supprimé chez OVH)",
+		Short: i18n.T("cli.crm_short"),
 		Args:  exactly(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := confirm("Supprimer cette campagne de l'historique local ?", yes); err != nil {
+			if err := confirm(i18n.T("cli.crm_confirm"), yes); err != nil {
 				return err
 			}
 			return withService(func(ctx context.Context, svc *service.Service) error {
@@ -479,12 +475,12 @@ func campRmCmd() *cobra.Command {
 				if asJSON {
 					printJSON(os.Stdout, map[string]string{"deleted": args[0]})
 				} else {
-					fmt.Println("Campagne supprimée.")
+					fmt.Println(i18n.T("cli.crm_done"))
 				}
 				return nil
 			})
 		},
 	}
-	c.Flags().BoolVarP(&yes, "yes", "y", false, "ne pas demander de confirmation")
+	c.Flags().BoolVarP(&yes, "yes", "y", false, i18n.T("cli.fl_yes"))
 	return c
 }

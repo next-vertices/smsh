@@ -14,6 +14,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"smsh/internal/creds"
+	"smsh/internal/i18n"
 	"smsh/internal/ovh"
 	"smsh/internal/service"
 	"smsh/internal/sms"
@@ -47,6 +48,8 @@ type App struct {
 // New crée l'App. SMSH_MOCK=1 branche un faux client OVH et un coffre
 // en mémoire (démo / développement du front sans credentials réels).
 func New() (*App, error) {
+	// Langue des messages du cœur : celle du système (l'interface la réaligne au démarrage).
+	i18n.SetLang(i18n.Detect())
 	if os.Getenv("SMSH_MOCK") == "1" {
 		dir, err := os.MkdirTemp("", "smsh-mock-")
 		if err != nil {
@@ -108,6 +111,14 @@ func (a *App) callBase() context.Context {
 func (a *App) callCtx() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(a.callBase(), callTimeout)
 }
+
+// ---- Langue ----
+
+// SystemLanguage renvoie la langue du système, ramenée à une langue prise en charge.
+func (a *App) SystemLanguage() string { return i18n.Detect() }
+
+// SetLanguage change la langue des messages du cœur et renvoie la langue appliquée.
+func (a *App) SetLanguage(tag string) string { return i18n.SetLang(tag) }
 
 // ---- Stockage & comptes ----
 
@@ -180,9 +191,9 @@ func (a *App) ParseRecipients(text string) sms.Receivers { return sms.ParseRecei
 // Renvoie un ImportInfo à ID vide si l'utilisateur annule.
 func (a *App) PickCSV() (service.ImportInfo, error) {
 	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Choisir un fichier CSV de destinataires",
+		Title: i18n.T("app.csv_pick_title"),
 		Filters: []runtime.FileFilter{
-			{DisplayName: "Fichiers CSV (*.csv;*.txt)", Pattern: "*.csv;*.txt"},
+			{DisplayName: i18n.T("app.csv_pick_filter"), Pattern: "*.csv;*.txt"},
 		},
 	})
 	if err != nil || path == "" {
@@ -192,23 +203,21 @@ func (a *App) PickCSV() (service.ImportInfo, error) {
 	return info, wrap(err)
 }
 
-// csvTemplate : modèle prêt pour Excel (BOM UTF-8, séparateur « ; »).
-const csvTemplate = "\ufefftelephone;prenom;nom;ville\r\n" +
-	"0612345678;Jean;Dupont;Lyon\r\n" +
-	"+33698765432;Léa;Martin;Paris\r\n"
+// csvTemplate : modèle prêt pour Excel (BOM UTF-8, séparateur « ; »), dans la langue courante.
+func csvTemplate() string { return "\ufeff" + i18n.T("app.csv_template") }
 
 // SaveCSVTemplate propose d'enregistrer un fichier CSV modèle.
 // Renvoie le chemin écrit, ou "" si l'utilisateur annule.
 func (a *App) SaveCSVTemplate() (string, error) {
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Enregistrer le modèle CSV",
-		DefaultFilename: "modele-campagne.csv",
-		Filters:         []runtime.FileFilter{{DisplayName: "Fichiers CSV (*.csv)", Pattern: "*.csv"}},
+		Title:           i18n.T("app.csv_save_title"),
+		DefaultFilename: i18n.T("app.csv_template_name"),
+		Filters:         []runtime.FileFilter{{DisplayName: i18n.T("app.csv_save_filter"), Pattern: "*.csv"}},
 	})
 	if err != nil || path == "" {
 		return "", wrap(err)
 	}
-	return path, wrap(os.WriteFile(path, []byte(csvTemplate), 0o644))
+	return path, wrap(os.WriteFile(path, []byte(csvTemplate()), 0o644))
 }
 
 func (a *App) SimulateCampaign(in service.PlanInput) (service.PlanReport, error) {

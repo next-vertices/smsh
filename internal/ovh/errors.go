@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	goovh "github.com/ovh/go-ovh/ovh"
+
+	"smsh/internal/i18n"
 )
 
 // Kind classe une erreur pour que l'UI puisse l'expliquer clairement.
@@ -63,13 +65,13 @@ func classify(err error) error {
 		return classifyAPI(&apiVal)
 	}
 	if errors.Is(err, context.Canceled) {
-		return &Error{Kind: KindNetwork, Message: "Opération annulée.", Err: err}
+		return &Error{Kind: KindNetwork, Message: i18n.T("ovh.canceled"), Err: err}
 	}
 	var netErr net.Error
 	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) {
-		return &Error{Kind: KindNetwork, Message: "Impossible de joindre l'API OVH : vérifiez votre connexion.", Err: err}
+		return &Error{Kind: KindNetwork, Message: i18n.T("ovh.network"), Err: err}
 	}
-	return &Error{Kind: KindUnknown, Message: "Erreur inattendue : " + err.Error(), Err: err}
+	return &Error{Kind: KindUnknown, Message: i18n.T("ovh.unexpected", i18n.P{"error": err.Error()}), Err: err}
 }
 
 func classifyAPI(api *goovh.APIError) *Error {
@@ -77,26 +79,26 @@ func classifyAPI(api *goovh.APIError) *Error {
 	e := &Error{Status: api.Code, Err: api}
 	switch {
 	case api.Code == http.StatusTooManyRequests:
-		e.Kind, e.Message = KindRateLimit, "Trop de requêtes : OVH limite le débit. Réessayez dans quelques instants."
+		e.Kind, e.Message = KindRateLimit, i18n.T("ovh.rate_limit")
 	case api.Code == http.StatusUnauthorized || api.Code == http.StatusForbidden:
 		e.Kind = KindCredentials
-		e.Message = "Identifiants refusés par OVH : clés invalides, expirées, ou droits insuffisants sur ce service."
+		e.Message = i18n.T("ovh.credentials")
 		if strings.Contains(msg, "expired") {
-			e.Message = "Le consumer key a expiré : générez-en un nouveau."
+			e.Message = i18n.T("ovh.consumer_expired")
 		}
-		e.Message += " Détail OVH (" + http.StatusText(api.Code) + ") : " + api.Message
+		e.Message += " " + i18n.T("ovh.detail", i18n.P{"status": http.StatusText(api.Code), "message": api.Message})
 	case strings.Contains(msg, "narrow your query"):
-		e.Kind, e.Message = KindTooManyResults, "Trop de résultats : OVH demande de restreindre la période."
+		e.Kind, e.Message = KindTooManyResults, i18n.T("ovh.too_many_results")
 	case api.Code == http.StatusNotFound:
-		e.Kind, e.Message = KindNotFound, "Service SMS introuvable : vérifiez le serviceName."
+		e.Kind, e.Message = KindNotFound, i18n.T("ovh.service_not_found")
 	case strings.Contains(msg, "credit"):
-		e.Kind, e.Message = KindInsufficientCredits, "Crédits SMS insuffisants pour cet envoi."
+		e.Kind, e.Message = KindInsufficientCredits, i18n.T("ovh.insufficient_credits")
 	case strings.Contains(msg, "receiver") || strings.Contains(msg, "destinataire") || strings.Contains(msg, "phone"):
-		e.Kind, e.Message = KindInvalidReceiver, "Numéro de destinataire invalide."
+		e.Kind, e.Message = KindInvalidReceiver, i18n.T("ovh.invalid_receiver")
 	case api.Code == http.StatusBadRequest:
-		e.Kind, e.Message = KindInvalidRequest, "Requête refusée par OVH : "+api.Message
+		e.Kind, e.Message = KindInvalidRequest, i18n.T("ovh.invalid_request", i18n.P{"message": api.Message})
 	default:
-		e.Kind, e.Message = KindUnknown, "Erreur OVH ("+http.StatusText(api.Code)+") : "+api.Message
+		e.Kind, e.Message = KindUnknown, i18n.T("ovh.error", i18n.P{"status": http.StatusText(api.Code), "message": api.Message})
 	}
 	return e
 }

@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/text/encoding/charmap"
 
+	"smsh/internal/i18n"
 	"smsh/internal/sms"
 )
 
@@ -57,7 +58,7 @@ func ParseCSV(data []byte) (Table, error) {
 		recs = append(recs, rec)
 	}
 	if len(recs) < 2 {
-		return Table{}, errors.New("le fichier doit contenir une ligne d'en-têtes puis au moins une ligne de données")
+		return Table{}, errors.New(i18n.T("camp.csv_shape"))
 	}
 	t := Table{Headers: cleanHeaders(recs[0]), Rows: recs[1:]}
 	return t, nil
@@ -144,7 +145,7 @@ type Contacts struct {
 // ExtractContacts normalise la colonne phone et dédoublonne les numéros.
 func ExtractContacts(t Table, phoneCol int) (Contacts, error) {
 	if phoneCol < 0 || phoneCol >= len(t.Headers) {
-		return Contacts{}, errors.New("choisissez la colonne contenant les numéros")
+		return Contacts{}, errors.New(i18n.T("camp.choose_column"))
 	}
 	var out Contacts
 	seen := map[string]bool{}

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	goovh "github.com/ovh/go-ovh/ovh"
+
+	"smsh/internal/i18n"
 )
 
 // caller est la partie de *goovh.Client utilisée ici (remplaçable en test).
@@ -183,7 +185,7 @@ func (c *client) CreateBatch(ctx context.Context, req BatchRequest) (Batch, erro
 	}
 	if req.SendAt != nil {
 		if req.SendAt.Before(c.now()) {
-			return Batch{}, &Error{Kind: KindInvalidRequest, Message: "La date d'envoi différé est dans le passé."}
+			return Batch{}, &Error{Kind: KindInvalidRequest, Message: i18n.T("ovh.past_date")}
 		}
 		body.Deferred = req.SendAt.UTC().Format(time.RFC3339)
 	}
@@ -248,7 +250,7 @@ func (c *client) Send(ctx context.Context, req SendRequest) (SendResult, error) 
 	if req.SendAt != nil {
 		d := req.SendAt.Sub(c.now())
 		if d < 0 {
-			return SendResult{}, &Error{Kind: KindInvalidRequest, Message: "La date d'envoi différé est dans le passé."}
+			return SendResult{}, &Error{Kind: KindInvalidRequest, Message: i18n.T("ovh.past_date")}
 		}
 		body.DifferedPeriod = int(math.Ceil(d.Minutes()))
 	}

@@ -4,6 +4,7 @@
   import { refreshOverview } from '../lib/actions'
   import { dateFr } from '../lib/format'
   import { ui } from '../lib/state.svelte'
+  import { dateTime, money, t } from '../lib/i18n.svelte'
 
   let recipients = $state('')
   let message = $state('')
@@ -26,8 +27,8 @@
     api.analyze(m).then((a) => { if (n === seqA) analysis = a }).catch(() => {})
   })
   $effect(() => {
-    const t = recipients, n = ++seqR
-    api.parseRecipients(t).then((r) => { if (n === seqR) parsed = r }).catch(() => {})
+    const rc = recipients, n = ++seqR
+    api.parseRecipients(rc).then((r) => { if (n === seqR) parsed = r }).catch(() => {})
   })
 
   // Coût : calculé par le backend (POST /sms/estimate + tarifs par pays) quand la saisie est terminée.
@@ -45,7 +46,7 @@
     costError = ''
     if (!input.message.trim() || !input.recipients.trim()) { costLoading = false; return }
     costLoading = true
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       try {
         const r = await api.estimateCost(input)
         if (n === seqC) cost = r
@@ -55,19 +56,18 @@
         if (n === seqC) costLoading = false
       }
     }, 600)
-    return () => clearTimeout(t)
+    return () => clearTimeout(timer)
   })
 
   let maxRcpt = $state(5)
   api.maxRecipients().then((n) => (maxRcpt = n)).catch(() => {})
 
-  const eur = (v: number, cur: string) =>
-    new Intl.NumberFormat('fr-FR', { style: 'currency', currency: cur || 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 3 }).format(v)
+  const eur = money
 
   function priceText(c: CostEstimate): string {
     if (!(c.priceMax > 0)) return '—'
     if (c.priceMin === c.priceMax) return eur(c.priceMax, c.currency)
-    return `${eur(c.priceMin, c.currency)} à ${eur(c.priceMax, c.currency)}`
+    return t('price.range', { min: eur(c.priceMin, c.currency), max: eur(c.priceMax, c.currency) })
   }
 
   const senders = $derived((ui.overview?.senders ?? []).filter((s) => s.status === 'enable'))
@@ -79,11 +79,11 @@
 
   const problems = $derived.by(() => {
     const p: string[] = []
-    if (!message.trim()) p.push('Saisissez un message.')
-    if (!validCount) p.push('Ajoutez au moins un destinataire.')
-    if (validCount > maxRcpt) p.push(`Maximum ${maxRcpt} destinataires en envoi unitaire (${validCount} saisis).`)
-    if (parsed?.invalid.length) p.push(`Numéro(s) invalide(s) : ${parsed.invalid.join(', ')}`)
-    if (scheduled && !sendAt) p.push("Choisissez la date d'envoi différé.")
+    if (!message.trim()) p.push(t('send.need_message'))
+    if (!validCount) p.push(t('send.need_recipient'))
+    if (validCount > maxRcpt) p.push(t('send.max_exceeded', { max: maxRcpt, got: validCount }))
+    if (parsed?.invalid.length) p.push(t('send.invalid_numbers', { numbers: parsed.invalid.join(', ') }))
+    if (scheduled && !sendAt) p.push(t('send.need_date'))
     return p
   })
   const canSend = $derived(problems.length === 0 && !sending)
@@ -117,12 +117,10 @@
     if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); ask() }
   }
 
-  const errorTitle: Record<string, string> = {
-    insufficient_credits: 'Crédits insuffisants',
-    rate_limit: 'Limite de débit atteinte',
-    invalid_receiver: 'Destinataire invalide',
-    credentials: 'Identifiants refusés',
-    network: 'Réseau indisponible',
+  const errorTitle = (kind: string) => {
+    const key = `err.${kind}`
+    const v = t(key)
+    return v === key ? t('err.default') : v
   }
   let lastKind = $state('')
 
@@ -134,50 +132,49 @@
 
 <svelte:window {onkeydown} />
 
-<h1>Envoyer un SMS</h1>
-<p class="muted">Envoi unitaire ou vers quelques numéros. <kbd>Ctrl</kbd>+<kbd>Entrée</kbd> pour envoyer.</p>
+<h1>{t('send.title')}</h1>
+<p class="muted">{t('send.intro')} <kbd>Ctrl</kbd>+<kbd>{t('key.enter')}</kbd> {t('send.shortcut')}</p>
 
 <div class="send">
 <div class="left">
 {#if outcome}
   <div class="alert ok" role="status">
-    <strong>{outcome.scheduled ? 'SMS programmé' : 'SMS envoyé'}</strong>
-    {outcome.sent.length} destinataire(s) · {outcome.creditsRemoved} crédit(s) débité(s) ·
-    {outcome.analysis.segments} segment(s) ({outcome.analysis.encoding === 'gsm7' ? 'GSM-7' : 'Unicode'})
-    {#if outcome.ids.length}<div class="small mono">ID : {outcome.ids.join(', ')}</div>{/if}
+    <strong>{outcome.scheduled ? t('send.sent_scheduled') : t('send.sent')}</strong>
+    {t('send.outcome', { recipients: outcome.sent.length, credits: outcome.creditsRemoved, segments: outcome.analysis.segments, encoding: outcome.analysis.encoding === 'gsm7' ? t('send.gsm7') : t('send.unicode') })}
+    {#if outcome.ids.length}<div class="small mono">{t('send.ids', { ids: outcome.ids.join(', ') })}</div>{/if}
     {#if outcome.rejected.length}
-      <div class="small">Refusés par OVH : {outcome.rejected.join(', ')}</div>
+      <div class="small">{t('send.rejected', { numbers: outcome.rejected.join(', ') })}</div>
     {/if}
   </div>
 {/if}
 
 {#if error}
-  <div class="alert error" role="alert"><strong>{errorTitle[lastKind] ?? "Échec de l'envoi"}</strong>{error}</div>
+  <div class="alert error" role="alert"><strong>{errorTitle(lastKind)}</strong>{error}</div>
 {/if}
 
 <div class="card form">
   <div class="field">
-    <label for="rcpt">Destinataire(s)</label>
-    <textarea id="rcpt" rows="3" bind:value={recipients} placeholder="06 12 34 56 78&#10;+33 6 98 76 54 32"></textarea>
+    <label for="rcpt">{t('send.recipients')}</label>
+    <textarea id="rcpt" rows="3" bind:value={recipients} placeholder={t('send.rcpt_ph')}></textarea>
     <div class="hint">
-      Un numéro par ligne (ou séparés par des virgules), {maxRcpt} maximum. Format national (06…) ou international (+33…).
+      {t('send.rcpt_hint', { max: maxRcpt })}
       {#if parsed && (validCount || parsed.invalid.length)}
-        <strong style="color: {validCount > maxRcpt ? 'var(--danger)' : 'var(--text)'}">{validCount}/{maxRcpt} valide(s)</strong>
-        {#if parsed.dupes}· {parsed.dupes} doublon(s) ignoré(s){/if}
-        {#if parsed.invalid.length}<span style="color: var(--danger)">· {parsed.invalid.length} invalide(s)</span>{/if}
+        <strong style="color: {validCount > maxRcpt ? 'var(--danger)' : 'var(--text)'}">{t('send.valid_count', { valid: validCount, max: maxRcpt })}</strong>
+        {#if parsed.dupes}· {t('send.dupes', { count: parsed.dupes })}{/if}
+        {#if parsed.invalid.length}<span style="color: var(--danger)">· {t('send.invalid_count', { count: parsed.invalid.length })}</span>{/if}
       {/if}
     </div>
   </div>
 
   <div class="field">
-    <label for="msg">Message</label>
+    <label for="msg">{t('send.message')}</label>
     <textarea id="msg" rows="5" bind:value={message}></textarea>
     {#if analysis}
       <div class="counter" class:warn={analysis.segments > 1}>
-        <span>{analysis.chars} caractère(s)</span>
-        <span>{analysis.segments} segment(s) · {analysis.remaining} restant(s) sur {analysis.perSegment}</span>
+        <span>{t('send.chars', { count: analysis.chars })}</span>
+        <span>{t('send.segments_left', { segments: analysis.segments, remaining: analysis.remaining, per: analysis.perSegment })}</span>
         <span class="badge" class:accent={analysis.encoding === 'ucs2'}>
-          {analysis.encoding === 'gsm7' ? 'GSM-7' : 'Unicode (70 car./segment)'}
+          {analysis.encoding === 'gsm7' ? t('send.gsm7') : t('send.unicode_limit')}
         </span>
       </div>
     {/if}
@@ -185,60 +182,60 @@
 
   <div class="grid2">
     <div class="field">
-      <label for="sender">Expéditeur</label>
+      <label for="sender">{t('send.sender')}</label>
       <select id="sender" bind:value={sender}>
-        <option value="">Par défaut (numéro court)</option>
+        <option value="">{t('send.sender_default')}</option>
         {#each senders as s}<option value={s.name}>{s.name}</option>{/each}
       </select>
     </div>
     <div class="field">
       <label class="check" for="sched">
-        <input id="sched" type="checkbox" bind:checked={scheduled} /> Envoi différé
+        <input id="sched" type="checkbox" bind:checked={scheduled} /> {t('send.scheduled')}
       </label>
-      <input type="datetime-local" bind:value={sendAt} disabled={!scheduled} aria-label="Date d'envoi différé" style="margin-top: 6px" />
+      <input type="datetime-local" bind:value={sendAt} disabled={!scheduled} aria-label={t('send.scheduled_aria')} style="margin-top: 6px" />
     </div>
   </div>
 
   <div class="field">
     <label class="check" for="stop">
       <input id="stop" type="checkbox" bind:checked={stopClause} />
-      Ajouter la mention « STOP » (SMS commercial)
+      {t('send.stop')}
     </label>
   </div>
 </div>
 </div>
 <aside class="side">
 <div class="card">
-  <div class="label2">Aperçu</div>
+  <div class="label2">{t('send.preview')}</div>
   <div class="phone">
-    <div class="bubble" class:empty={!message}>{message || 'Votre message apparaîtra ici…'}</div>
+    <div class="bubble" class:empty={!message}>{message || t('send.preview_ph')}</div>
     <div class="small muted meta">
-      {sender || 'Expéditeur par défaut'} → {validCount ? `${validCount} destinataire(s)` : 'aucun destinataire'}
-      {#if scheduled && sendAt}· le {new Date(sendAt).toLocaleString('fr-FR')}{/if}
+      {sender || t('send.sender_default_label')} → {validCount ? t('send.to_recipients', { count: validCount }) : t('send.no_recipient')}
+      {#if scheduled && sendAt}· {t('send.on_date', { date: dateTime(sendAt) })}{/if}
     </div>
   </div>
 
   {#if message.trim() && validCount}
     <div class="cost" class:pending={costLoading} aria-live="polite">
       {#if costLoading}
-        <span class="muted">Calcul du coût auprès d'OVH…</span>
+        <span class="muted">{t('send.cost_loading')}</span>
       {:else if costError}
-        <span style="color: var(--danger)">Coût indisponible : {costError}</span>
+        <span style="color: var(--danger)">{t('send.cost_unavailable', { error: costError })}</span>
       {:else if cost && cost.lines.length}
         <div class="head">
           <div>
-            <div class="label">Prix estimé</div>
+            <div class="label">{t('send.price')}</div>
             <div class="price">{priceText(cost)}</div>
-            <div class="small muted">HT · tarif public OVH selon le pack acheté</div>
+            <div class="small muted">{t('send.price_note')}</div>
           </div>
           <div class="credits">
-            <div class="label">Crédits</div>
+            <div class="label">{t('send.credits')}</div>
             <div class="big">{cost.totalCredits}</div>
-            {#if credits !== undefined}<div class="small muted">solde : {credits} → {Math.max(credits - cost.totalCredits, 0)}</div>{/if}
+            {#if credits !== undefined}<div class="small muted">{t('send.balance', { from: credits, to: Math.max(credits - cost.totalCredits, 0) })}</div>{/if}
           </div>
         </div>
         <div class="small muted detail">
-          {cost.parts} segment(s) · {cost.encoding === 'unicode' ? 'Unicode' : 'GSM-7'} · {cost.recipients} destinataire(s)
+          {t('send.cost_detail', { parts: cost.parts, encoding: cost.encoding === 'unicode' ? t('send.unicode') : t('send.gsm7'), recipients: cost.recipients })}
         </div>
         {#if cost.lines.length > 1 || cost.lines[0].creditsPerSms !== 1}
           <table class="small">
@@ -246,15 +243,15 @@
               {#each cost.lines as l}
                 <tr>
                   <td class="mono">{l.country.toUpperCase()}</td>
-                  <td>{l.recipients} dest. × {cost.parts} seg. × {l.creditsPerSms} cr.</td>
-                  <td class="num">{l.credits} cr.</td>
+                  <td>{t('send.cost_line', { recipients: l.recipients, parts: cost.parts, rate: l.creditsPerSms })}</td>
+                  <td class="num">{t('send.cr', { credits: l.credits })}</td>
                 </tr>
               {/each}
             </tbody>
           </table>
         {/if}
         {#if cost.unknown.length}
-          <div class="small" style="color: var(--warn)">Pays inconnu, non comptés : {cost.unknown.join(', ')}</div>
+          <div class="small" style="color: var(--warn)">{t('send.unknown_countries', { numbers: cost.unknown.join(', ') })}</div>
         {/if}
         {#if cost.warning}<div class="small" style="color: var(--warn)">{cost.warning}</div>{/if}
       {/if}
@@ -262,13 +259,13 @@
   {/if}
 
   {#if tooExpensive}
-    <div class="alert warn">Coût estimé ({estimate}) supérieur à vos crédits ({credits}).</div>
+    <div class="alert warn">{t('send.too_expensive', { estimate, credits })}</div>
   {/if}
 
   <div class="row between">
     <div class="muted small">{#if problems.length}{problems[0]}{/if}</div>
     <button class="primary" onclick={ask} disabled={!canSend || costLoading}>
-      {scheduled ? 'Programmer' : 'Envoyer'}…
+      {scheduled ? t('send.schedule') : t('send.send')}…
     </button>
   </div>
 </div>
@@ -276,26 +273,26 @@
 
 <aside class="recent">
   <div class="card">
-    <h2>Derniers SMS</h2>
+    <h2>{t('send.recent')}</h2>
     {#each recent as h (h.id)}
       <div class="rc">
         <div class="row between"><span class="mono small">{h.receiver}</span><span class="small muted">{dateFr(h.createdAt)}</span></div>
         <div class="small muted rcmsg">{h.message}</div>
       </div>
     {:else}
-      <p class="muted small" style="margin: 0">Aucun SMS en cache : synchronisez l'historique.</p>
+      <p class="muted small" style="margin: 0">{t('send.recent_empty')}</p>
     {/each}
   </div>
 </aside>
 </div>
 
 {#if confirming}
-  <Confirm title="Confirmer l'envoi" confirmLabel={scheduled ? 'Programmer' : 'Envoyer'} busy={sending}
+  <Confirm title={t('send.confirm_title')} confirmLabel={scheduled ? t('send.schedule') : t('send.send')} busy={sending}
     onconfirm={doSend} oncancel={() => (confirming = false)}>
     <p>
-      Envoyer ce SMS à <strong>{validCount} destinataire(s)</strong> —
-      {segments} segment(s){#if cost}, environ <strong>{estimate} crédit(s)</strong>{/if}
-      {#if scheduled}, le {new Date(sendAt).toLocaleString('fr-FR')}{/if} ?
+      {t('send.confirm_pre')} <strong>{t('send.to_recipients', { count: validCount })}</strong> —
+      {t('send.chars_segments', { count: segments })}{#if cost}, {t('send.confirm_about')} <strong>{t('app.credits_left', { count: estimate })}</strong>{/if}
+      {#if scheduled}, {t('send.on_date', { date: dateTime(sendAt) })}{/if}{t('send.confirm_end')}
     </p>
     <blockquote>{message}</blockquote>
   </Confirm>

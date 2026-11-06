@@ -1,5 +1,6 @@
 // État global de l'UI (navigation, comptes, thème, modale de passphrase).
 import type { AccountView, ServiceInfo, VaultStatus } from './api'
+import { t } from './i18n.svelte'
 
 export type View = 'send' | 'campaigns' | 'history' | 'settings'
 export type Theme = 'dark' | 'light'
@@ -38,14 +39,14 @@ export function requestUnlock(): Promise<void> {
     return new Promise((resolve, reject) => {
       const { resolve: r, reject: j } = prev
       prev.resolve = () => { r(); resolve() }
-      prev.reject = () => { j(); reject(new Error('Coffre verrouillé : opération annulée.')) }
+      prev.reject = () => { j(); reject(new Error(t('unlock.canceled'))) }
     })
   }
   return new Promise((resolve, reject) => {
     ui.unlock = {
       initialized: ui.status?.initialized ?? true,
       resolve: () => { ui.unlock = null; resolve() },
-      reject: () => { ui.unlock = null; reject(new Error('Coffre verrouillé : opération annulée.')) },
+      reject: () => { ui.unlock = null; reject(new Error(t('unlock.canceled'))) },
     }
   })
 }

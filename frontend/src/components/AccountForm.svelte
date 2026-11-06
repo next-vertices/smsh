@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api, ApiError, emptyInput, type AccountView, type ServiceInfo } from '../lib/api'
   import { BrowserOpenURL } from '../../wailsjs/runtime/runtime'
+  import { t } from '../lib/i18n.svelte'
 
   let { account, oncancel, onsaved }: {
     account?: AccountView
@@ -65,11 +66,11 @@
 <form onsubmit={save}>
   <div class="grid2">
     <div class="field">
-      <label for="acc-name">Nom du compte</label>
-      <input id="acc-name" type="text" bind:value={form.name} placeholder="Perso, Boulot…" />
+      <label for="acc-name">{t('account.name')}</label>
+      <input id="acc-name" type="text" bind:value={form.name} placeholder={t('account.name_ph')} />
     </div>
     <div class="field">
-      <label for="acc-ep">Région OVH</label>
+      <label for="acc-ep">{t('account.region')}</label>
       <select id="acc-ep" bind:value={form.endpoint}>
         {#each endpoints as ep}<option value={ep}>{ep}</option>{/each}
       </select>
@@ -79,51 +80,51 @@
   <div class="field">
     <label for="acc-svc">serviceName</label>
     <input id="acc-svc" type="text" bind:value={form.serviceName} placeholder="sms-ab123456-1" autocomplete="off" />
-    <div class="hint">Visible dans l'espace client OVH, rubrique Télécom → SMS.</div>
+    <div class="hint">{t('account.svc_hint')}</div>
   </div>
 
   <div class="grid2">
     <div class="field">
-      <label for="acc-ak">Application key</label>
+      <label for="acc-ak">{t('account.app_key')}</label>
       <input id="acc-ak" type="password" bind:value={form.appKey} autocomplete="off"
         placeholder={editing ? account?.appKey : ''} />
     </div>
     <div class="field">
-      <label for="acc-as">Application secret</label>
+      <label for="acc-as">{t('account.app_secret')}</label>
       <input id="acc-as" type="password" bind:value={form.appSecret} autocomplete="off"
         placeholder={editing ? account?.appSecret : ''} />
     </div>
   </div>
   <div class="field">
-    <label for="acc-ck">Consumer key</label>
+    <label for="acc-ck">{t('account.consumer_key')}</label>
     <input id="acc-ck" type="password" bind:value={form.consumerKey} autocomplete="off"
       placeholder={editing ? account?.consumerKey : ''} />
     <div class="hint">
-      {#if editing}Laissez vide un champ pour conserver sa valeur actuelle. {/if}
-      Générez les clés sur
-      <button type="button" class="link" onclick={() => BrowserOpenURL(tokenUrls[form.endpoint] ?? tokenUrls['ovh-eu'])}>la page de création de token OVH</button>
-      avec les droits <span class="mono">GET/POST/DELETE /sms/*</span>.
+      {#if editing}{t('account.keep_hint')} {/if}
+      {t('account.generate_pre')}
+      <button type="button" class="link" onclick={() => BrowserOpenURL(tokenUrls[form.endpoint] ?? tokenUrls['ovh-eu'])}>{t('account.token_page')}</button>
+      {t('account.with_rights')} <span class="mono">GET/POST/DELETE /sms/*</span>.
     </div>
   </div>
 
   {#if error}
-    <div class="alert error" role="alert"><strong>Échec</strong>{error}</div>
+    <div class="alert error" role="alert"><strong>{t('account.failure')}</strong>{error}</div>
   {/if}
   {#if testResult}
     <div class="alert ok" role="status">
-      <strong>Connexion réussie</strong>
-      Service {testResult.serviceName} · {testResult.creditsLeft} crédit(s) · {testResult.senders.length} expéditeur(s)
+      <strong>{t('account.test_ok')}</strong>
+      {t('account.test_summary', { service: testResult.serviceName, credits: testResult.creditsLeft, senders: testResult.senders.length })}
     </div>
   {/if}
 
   <div class="row between">
     <button type="button" onclick={test} disabled={testing || saving}>
-      {testing ? 'Test en cours…' : 'Tester la connexion'}
+      {testing ? t('account.testing') : t('account.test')}
     </button>
     <div class="row">
-      {#if oncancel}<button type="button" onclick={oncancel} disabled={saving}>Annuler</button>{/if}
+      {#if oncancel}<button type="button" onclick={oncancel} disabled={saving}>{t('common.cancel')}</button>{/if}
       <button type="submit" class="primary" disabled={saving || testing}>
-        {saving ? 'Enregistrement…' : 'Enregistrer'}
+        {saving ? t('account.saving') : t('account.save')}
       </button>
     </div>
   </div>

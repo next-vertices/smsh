@@ -63,6 +63,8 @@ async function call<T>(fn: () => Promise<T>): Promise<T> {
 
 export const api = {
   status: () => call(Go.Status),
+  systemLanguage: () => Go.SystemLanguage(),
+  setLanguage: (lang: string) => Go.SetLanguage(lang),
   unlock: (pass: string) => call(() => Go.Unlock(pass)),
   endpoints: () => call(Go.Endpoints),
   accounts: () => call(Go.ListAccounts),

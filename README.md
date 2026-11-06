@@ -111,7 +111,21 @@ Points à connaître :
 - Coffre à passphrase : variable `SMSH_PASSPHRASE`, sinon saisie masquée.
 - Campagne **locale** : exécutée par le terminal qui l'a lancée. `Ctrl-C` la met en pause, `smsh campaign resume <id>` la reprend. Une campagne **batch** est traitée par OVH et continue sans le terminal (`--wait` pour l'attendre).
 - `smsh.exe` étant une application « fenêtre », `cmd` et PowerShell ne l'attendent pas : pour récupérer le code de sortie ou chaîner des commandes, utilisez `Start-Process -Wait -NoNewWindow` / `start /wait`, ou redirigez la sortie (`.\smsh.exe ls --json | Out-String`).
+- `SMSH_LANG=fr|en` : langue de la CLI (sinon celle du système).
 - `SMSH_MOCK=1` : simulation sans réseau ; `SMSH_MOCK_DIR=<dossier>` conserve les campagnes entre deux appels.
+
+## Langues (i18n)
+
+L'interface, les messages du cœur (erreurs, avertissements) et la CLI sont traduits. Langue par défaut : **français (fr-FR)**. Au démarrage, la langue du système est reprise ; si elle n'est pas française, l'application passe en **anglais britannique (en-GB)**. Le choix manuel (Paramètres → Langue : Automatique / Français / English) est conservé. La CLI suit la langue du système, ou `SMSH_LANG=fr|en`.
+
+| Fichiers | Contenu |
+|---|---|
+| `frontend/src/locales/<langue>.json` | textes de l'interface (clés plates `section.nom`) |
+| `internal/i18n/locales/<langue>.json` | messages du cœur Go et de la CLI |
+
+Les paramètres s'écrivent `{nom}` ; les pluriels utilisent les suffixes `_one` / `_other` avec le paramètre `count`. Les formats de date, de nombre et de monnaie suivent la langue.
+
+**Ajouter une langue** : créer les deux fichiers JSON, déclarer la langue dans `frontend/src/lib/i18n.svelte.ts` (`LANGS`, `normalizeLang`) et dans `internal/i18n/i18n.go` (`Supported`, `Normalize`), puis ajouter l'entrée dans le sélecteur des Paramètres. `npm run check` (clés manquantes ou inutilisées, paramètres incohérents) et `go test ./internal/i18n` vérifient la cohérence des catalogues.
 
 ## Configuration OVH
 

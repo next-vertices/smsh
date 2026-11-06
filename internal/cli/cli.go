@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"smsh/internal/i18n"
 	"smsh/internal/service"
 )
 
@@ -41,18 +42,14 @@ var asJSON bool
 
 func newRoot() *cobra.Command {
 	root := &cobra.Command{
-		Use:   "smsh",
-		Short: "Smsh : envoi et suivi de SMS OVH en ligne de commande",
-		Long: `Smsh en ligne de commande. Utilise les mêmes comptes, le même coffre de clés
-et la même base locale que l'application graphique (configurez le compte dans l'application).
-
-Coffre protégé par passphrase : définissez SMSH_PASSPHRASE ou saisissez-la quand elle est demandée.
-Codes de sortie : 0 succès, 1 erreur, 2 erreur d'usage.`,
+		Use:           "smsh",
+		Short:         i18n.T("cli.root_short"),
+		Long:          i18n.T("cli.root_long"),
 		Version:       Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.PersistentFlags().BoolVar(&asJSON, "json", false, "sortie JSON (pour les scripts)")
+	root.PersistentFlags().BoolVar(&asJSON, "json", false, i18n.T("cli.flag_json"))
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err.Error()} })
 	root.AddCommand(statusCmd(), accountCmd(), sendCmd(), lsCmd(), rmCmd(), syncCmd(), campaignCmd())
 	return root
@@ -79,6 +76,7 @@ func IsCLI(args []string) bool {
 
 // Run exécute la CLI et renvoie le code de sortie.
 func Run(args []string) int {
+	i18n.SetLang(i18n.Detect())
 	root := newRoot()
 	root.SetArgs(args)
 	err := root.Execute()
@@ -98,16 +96,16 @@ func Run(args []string) int {
 	case errors.As(err, &pe):
 		p = service.Problem{Kind: "cli", Message: pe.msg}
 	case errors.Is(err, context.Canceled):
-		p = service.Problem{Kind: "cli", Message: "interrompu"}
+		p = service.Problem{Kind: "cli", Message: i18n.T("cli.interrupted")}
 	default:
 		p = service.Describe(err)
 	}
 	if asJSON {
 		printJSON(os.Stdout, map[string]any{"error": p})
 	} else {
-		fmt.Fprintln(os.Stderr, "Erreur :", p.Message)
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error_prefix"), p.Message)
 		if code == exitUsage {
-			fmt.Fprintln(os.Stderr, "Aide : smsh --help")
+			fmt.Fprintln(os.Stderr, i18n.T("cli.help_hint"))
 		}
 	}
 	return code
@@ -117,7 +115,7 @@ func Run(args []string) int {
 func exactly(n int) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
 		if len(args) != n {
-			return usagef("%s : %d argument(s) attendu(s), %d reçu(s) (voir « %s --help »)", cmd.CommandPath(), n, len(args), cmd.CommandPath())
+			return usagef("%s", i18n.T("cli.args_count", i18n.P{"cmd": cmd.CommandPath(), "n": n, "got": len(args)}))
 		}
 		return nil
 	}

@@ -15,6 +15,7 @@ import (
 	"golang.org/x/term"
 
 	"smsh/internal/creds"
+	"smsh/internal/i18n"
 	"smsh/internal/ovh"
 	"smsh/internal/service"
 	"smsh/internal/store"
@@ -88,14 +89,14 @@ func unlock(m *creds.Manager) error {
 		return nil
 	}
 	if !st.Initialized {
-		return failf("le coffre n'est pas encore créé : lancez d'abord l'application Smsh pour configurer un compte")
+		return failf("%s", i18n.T("cli.vault_not_created"))
 	}
 	pass := os.Getenv("SMSH_PASSPHRASE")
 	if pass == "" {
 		if !term.IsTerminal(int(os.Stdin.Fd())) {
-			return failf("coffre verrouillé : définissez SMSH_PASSPHRASE (entrée non interactive)")
+			return failf("%s", i18n.T("cli.vault_locked"))
 		}
-		fmt.Fprint(os.Stderr, "Passphrase du coffre : ")
+		fmt.Fprint(os.Stderr, i18n.T("cli.passphrase_prompt"))
 		b, err := term.ReadPassword(int(os.Stdin.Fd()))
 		fmt.Fprintln(os.Stderr)
 		if err != nil {
@@ -134,15 +135,15 @@ func confirm(question string, yes bool) error {
 		return nil
 	}
 	if !interactive() {
-		return usagef("confirmation requise : ajoutez --yes pour continuer sans terminal interactif")
+		return usagef("%s", i18n.T("cli.confirm_required"))
 	}
-	fmt.Fprintf(os.Stderr, "%s [o/N] ", question)
+	fmt.Fprint(os.Stderr, i18n.T("cli.confirm_prompt", i18n.P{"q": question}))
 	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 	switch strings.ToLower(strings.TrimSpace(line)) {
 	case "o", "oui", "y", "yes":
 		return nil
 	}
-	return failf("annulé")
+	return failf("%s", i18n.T("cli.canceled"))
 }
 
 func euro(lo, hi float64, cur string) string {
@@ -170,11 +171,11 @@ func dateFr(t time.Time) string { return t.Local().Format("02/01/2006 15:04:05")
 func readMessage(msg, file string) (string, error) {
 	switch {
 	case msg != "" && file != "":
-		return "", usagef("utilisez --message ou --file, pas les deux")
+		return "", usagef("%s", i18n.T("cli.msg_both"))
 	case msg != "":
 		return msg, nil
 	case file == "":
-		return "", usagef("message manquant : --message \"texte\" ou --file chemin")
+		return "", usagef("%s", i18n.T("cli.msg_missing"))
 	}
 	var b []byte
 	var err error

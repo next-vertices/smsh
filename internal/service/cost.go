@@ -6,6 +6,7 @@ import (
 	"sort"
 	"sync"
 
+	"smsh/internal/i18n"
 	"smsh/internal/ovh"
 	"smsh/internal/sms"
 )
@@ -119,9 +120,9 @@ func (s *Service) EstimateCost(ctx context.Context, in CostInput) (CostEstimate,
 			enc = "unicode"
 		}
 		est.Characters, est.Encoding, est.PerPart, est.Parts = an.Chars, enc, an.PerSegment, an.Segments
-		est.Warning = "Segments calculés localement (estimation OVH indisponible)."
+		est.Warning = i18n.T("svc.segments_local")
 		if err != nil {
-			est.Warning = "Segments calculés localement : " + err.Error()
+			est.Warning = i18n.T("svc.segments_local_err", i18n.P{"error": err.Error()})
 		}
 	}
 

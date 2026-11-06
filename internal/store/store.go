@@ -12,6 +12,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"smsh/internal/i18n"
 )
 
 // Statuts d'une campagne.
@@ -331,7 +333,7 @@ func (s *Store) DeleteCampaign(ctx context.Context, id string) error {
 // ResetInterrupted passe en pause les campagnes restées « running » (application fermée en cours d'envoi).
 func (s *Store) ResetInterrupted(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE campaigns SET status='paused', error=?, updated_at=? WHERE status='running' AND mode='local'`,
-		"Interrompue (application fermée) : reprenez l'envoi.", fmtTime(time.Now()))
+		i18n.T("store.interrupted"), fmtTime(time.Now()))
 	return err
 }
 

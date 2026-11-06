@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"sync"
 	"time"
+
+	"smsh/internal/i18n"
 )
 
 var e164 = regexp.MustCompile(`^\+[1-9]\d{7,14}$`)
@@ -113,7 +115,7 @@ func (m *Mock) ListOutgoing(_ context.Context, _ string, f OutgoingFilter) ([]in
 		ids = append(ids, id)
 	}
 	if m.MaxList > 0 && len(ids) > m.MaxList {
-		return nil, &Error{Kind: KindTooManyResults, Status: 400, Message: "Trop de résultats : OVH demande de restreindre la période."}
+		return nil, &Error{Kind: KindTooManyResults, Status: 400, Message: i18n.T("ovh.too_many_results")}
 	}
 	return ids, nil
 }
@@ -154,7 +156,7 @@ func (m *Mock) CreateBatch(_ context.Context, req BatchRequest) (Batch, error) {
 	}
 	cost := float64(len(req.To))
 	if cost > m.Info.CreditsLeft {
-		return Batch{}, &Error{Kind: KindInsufficientCredits, Message: "Crédits SMS insuffisants pour cet envoi.", Status: 400}
+		return Batch{}, &Error{Kind: KindInsufficientCredits, Message: i18n.T("ovh.insufficient_credits"), Status: 400}
 	}
 	m.nextID++
 	b := Batch{ID: fmt.Sprintf("batch-%d", m.nextID), Name: req.Name, Status: "PENDING",
@@ -234,7 +236,7 @@ func (m *Mock) Send(_ context.Context, req SendRequest) (SendResult, error) {
 	}
 	cost := per * float64(len(res.ValidReceivers))
 	if cost > m.Info.CreditsLeft {
-		return SendResult{}, &Error{Kind: KindInsufficientCredits, Message: "Crédits SMS insuffisants pour cet envoi.", Status: 400}
+		return SendResult{}, &Error{Kind: KindInsufficientCredits, Message: i18n.T("ovh.insufficient_credits"), Status: 400}
 	}
 	m.Info.CreditsLeft -= cost
 	res.CreditsRemoved = cost
