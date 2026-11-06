@@ -38,6 +38,8 @@ jobs:
           npm ci
           npm run check
           npm run build
+      - name: Formatage Go
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; echo 'Fichiers à formater avec gofmt'; exit 1; }
       - name: Go vet + tests
         run: |
           go vet -tags webkit2_41 ./...
