@@ -6,7 +6,7 @@ require (
 	filippo.io/age v1.3.2
 	github.com/ovh/go-ovh v1.9.0
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.9
+	github.com/spf13/pflag v1.1.0
 	github.com/wailsapp/wails/v2 v2.17.1
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/term v0.47.0
