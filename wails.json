@@ -6,6 +6,12 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
+  "info": {
+    "companyName": "Next Vertices",
+    "productName": "Smsh",
+    "productVersion": "1.0.0",
+    "comments": "Client de bureau pour les API SMS d'OVH"
+  },
   "author": {
     "name": "Adrien MOUTET",
     "email": "adrien.moutetcvl@gmail.com"
