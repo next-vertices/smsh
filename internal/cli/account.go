@@ -9,13 +9,14 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"smsh/internal/i18n"
 	"smsh/internal/service"
 )
 
 func statusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
-		Short: "Teste la connexion et affiche le solde et les expéditeurs du compte actif",
+		Short: i18n.T("cli.status_short"),
 		Args:  exactly(0),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return withService(func(ctx context.Context, svc *service.Service) error {
@@ -29,15 +30,15 @@ func statusCmd() *cobra.Command {
 					printJSON(os.Stdout, ov)
 					return nil
 				}
-				fmt.Printf("Compte        : %s (%s)\n", ov.Account, ov.ServiceName)
-				fmt.Printf("État          : %s\n", ov.Status)
-				fmt.Printf("Crédits       : %v\n", ov.CreditsLeft)
+				fmt.Println(i18n.T("cli.l_account", i18n.P{"name": ov.Account, "service": ov.ServiceName}))
+				fmt.Println(i18n.T("cli.l_state", i18n.P{"v": ov.Status}))
+				fmt.Println(i18n.T("cli.l_credits", i18n.P{"v": ov.CreditsLeft}))
 				names := make([]string, 0, len(ov.Senders))
 				for _, s := range ov.Senders {
 					names = append(names, fmt.Sprintf("%s (%s)", s.Name, s.Type))
 				}
 				if len(names) > 0 {
-					fmt.Printf("Expéditeurs   : %s\n", strings.Join(names, ", "))
+					fmt.Println(i18n.T("cli.l_senders", i18n.P{"v": strings.Join(names, ", ")}))
 				}
 				return nil
 			})
@@ -46,10 +47,10 @@ func statusCmd() *cobra.Command {
 }
 
 func accountCmd() *cobra.Command {
-	c := &cobra.Command{Use: "account", Short: "Comptes OVH enregistrés (ajout et modification dans l'application)"}
+	c := &cobra.Command{Use: "account", Short: i18n.T("cli.account_short")}
 	c.AddCommand(&cobra.Command{
 		Use:   "ls",
-		Short: "Liste les comptes (secrets masqués)",
+		Short: i18n.T("cli.account_ls_short"),
 		Args:  exactly(0),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return withService(func(_ context.Context, svc *service.Service) error {
@@ -62,7 +63,7 @@ func accountCmd() *cobra.Command {
 					return nil
 				}
 				tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-				fmt.Fprintln(tw, "ACTIF\tID\tNOM\tSERVICE\tENDPOINT")
+				fmt.Fprintln(tw, i18n.T("cli.th_account"))
 				for _, v := range views {
 					mark := ""
 					if v.Active {
@@ -75,8 +76,8 @@ func accountCmd() *cobra.Command {
 		},
 	})
 	c.AddCommand(&cobra.Command{
-		Use:   "use <id|nom>",
-		Short: "Change le compte actif (partagé avec l'application)",
+		Use:   i18n.T("cli.account_use_usage"),
+		Short: i18n.T("cli.account_use_short"),
 		Args:  exactly(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(_ context.Context, svc *service.Service) error {
@@ -92,12 +93,12 @@ func accountCmd() *cobra.Command {
 						if asJSON {
 							printJSON(os.Stdout, map[string]string{"active": v.ID, "name": v.Name})
 						} else {
-							fmt.Printf("Compte actif : %s (%s)\n", v.Name, v.ServiceName)
+							fmt.Println(i18n.T("cli.account_active", i18n.P{"name": v.Name, "service": v.ServiceName}))
 						}
 						return nil
 					}
 				}
-				return failf("compte introuvable : %s (voir « smsh account ls »)", args[0])
+				return failf("%s", i18n.T("cli.account_unknown", i18n.P{"name": args[0]}))
 			})
 		},
 	})

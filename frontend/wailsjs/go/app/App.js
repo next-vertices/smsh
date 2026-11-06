@@ -110,6 +110,10 @@ export function SetActiveAccount(arg1) {
   return window['go']['app']['App']['SetActiveAccount'](arg1);
 }
 
+export function SetLanguage(arg1) {
+  return window['go']['app']['App']['SetLanguage'](arg1);
+}
+
 export function SimulateCampaign(arg1) {
   return window['go']['app']['App']['SimulateCampaign'](arg1);
 }
@@ -120,6 +124,10 @@ export function Status() {
 
 export function SyncHistory(arg1) {
   return window['go']['app']['App']['SyncHistory'](arg1);
+}
+
+export function SystemLanguage() {
+  return window['go']['app']['App']['SystemLanguage']();
 }
 
 export function TestConnection(arg1) {

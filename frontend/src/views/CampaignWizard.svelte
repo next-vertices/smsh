@@ -5,6 +5,7 @@
   import { api, ApiError, type Campaign, type ImportInfo, type PlanReport } from '../lib/api'
   import { duration, modeLabel, priceRange } from '../lib/format'
   import { ui } from '../lib/state.svelte'
+  import { dateTime, t } from '../lib/i18n.svelte'
 
   let { oncancel, onlaunched }: { oncancel: () => void; onlaunched: (c: Campaign) => void } = $props()
 
@@ -70,7 +71,7 @@
         try {
           const r = await Promise.race([
             api.simulate(input),
-            new Promise<never>((_, rej) => setTimeout(() => rej(new ApiError('unknown', 'La simulation met trop de temps à répondre (25 s).')), 25000)),
+            new Promise<never>((_, rej) => setTimeout(() => rej(new ApiError('unknown', t('wz.sim_timeout'))), 25000)),
           ])
           if (n !== seq) return
           // Tableaux jamais null (Go sérialise une slice nil en null).
@@ -123,29 +124,29 @@
 </script>
 
 <div class="row between" style="margin-bottom: 4px">
-  <h1>Nouvelle campagne</h1>
-  <button onclick={oncancel}>Retour</button>
+  <h1>{t('wz.title')}</h1>
+  <button onclick={oncancel}>{t('common.back')}</button>
 </div>
-<p class="muted">Importez un CSV, rédigez le message, vérifiez la simulation puis lancez.</p>
+<p class="muted">{t('wz.intro')}</p>
 
 {#if error}<div class="alert error" role="alert">{error}</div>{/if}
 
 <div class="wz">
 <div class="wz-left">
 <div class="card">
-  <h2>1. Destinataires</h2>
+  <h2>{t('wz.s1')}</h2>
   <div class="row">
-    <button onclick={pick}>{imp ? 'Changer de fichier…' : 'Choisir un fichier CSV…'}</button>
-    {#if imp}<span><strong>{imp.file}</strong> <span class="muted">· {imp.rows} ligne(s)</span></span>{/if}
+    <button onclick={pick}>{imp ? t('wz.change_file') : t('wz.choose_file')}</button>
+    {#if imp}<span><strong>{imp.file}</strong> <span class="muted">{t('wz.rows', { count: imp.rows })}</span></span>{/if}
     <span class="grow"></span>
-    <CsvTemplate label="Modèle CSV" />
+    <CsvTemplate label={t('wz.template_btn')} />
   </div>
-  <div class="hint">La première ligne doit contenir les en-têtes. Séparateur ; , ou tabulation, UTF-8 ou Excel (Windows-1252).</div>
+  <div class="hint">{t('wz.csv_hint')}</div>
   {#if imp}
     <div class="field" style="margin-top: 12px; max-width: 320px">
-      <label for="pcol">Colonne des numéros</label>
+      <label for="pcol">{t('wz.phone_col')}</label>
       <select id="pcol" bind:value={phoneCol}>
-        {#if phoneCol < 0}<option value={-1}>— choisir —</option>{/if}
+        {#if phoneCol < 0}<option value={-1}>{t('wz.choose')}</option>{/if}
         {#each imp.headers as h, i}<option value={i}>{h}</option>{/each}
       </select>
     </div>
@@ -163,59 +164,59 @@
 </div>
 
 <div class="card" class:disabled={!imp}>
-  <h2>2. Message</h2>
+  <h2>{t('wz.s2')}</h2>
   <div class="field">
-    <label for="cname">Nom de la campagne</label>
-    <input id="cname" type="text" bind:value={name} placeholder="Relance septembre" />
+    <label for="cname">{t('wz.name')}</label>
+    <input id="cname" type="text" bind:value={name} placeholder={t('wz.name_ph')} />
   </div>
   <div class="field">
-    <label for="ctpl">Message</label>
+    <label for="ctpl">{t('wz.message')}</label>
     <textarea id="ctpl" rows="4" bind:this={tpl} bind:value={template} disabled={!imp}
-      placeholder="Bonjour {'{prenom}'}, votre rendez-vous est confirmé."></textarea>
+      placeholder={t('wz.tpl_ph')}></textarea>
     {#if imp}
       <div class="chips">
-        <span class="muted small">Insérer :</span>
+        <span class="muted small">{t('wz.insert')}</span>
         {#each imp.headers as h}<button type="button" class="chip" onclick={() => insertVar(h)}>{'{' + h + '}'}</button>{/each}
       </div>
     {/if}
-    <div class="hint">{template.length} caractère(s){#if report} · jusqu'à {report.maxParts} segment(s) par SMS{/if}</div>
+    <div class="hint">{t('send.chars', { count: template.length })}{#if report}{t('wz.up_to', { max: report.maxParts })}{/if}</div>
   </div>
 
   <div class="field">
-    <div class="label2">Mode d'envoi</div>
+    <div class="label2">{t('wz.mode_title')}</div>
     <label class="check" class:off={hasVars}>
       <input type="radio" bind:group={mode} value="batch" disabled={hasVars} />
-      <span><strong>Batch OVH</strong> — même message pour tous ; OVH gère l'envoi (continue application fermée), statistiques de livraison. Pas de pause.</span>
+      <span><strong>{t('mode.batch')}</strong>{t('wz.batch_desc')}</span>
     </label>
     <label class="check" style="margin-top: 6px">
       <input type="radio" bind:group={mode} value="local" />
-      <span><strong>Personnalisé</strong> — un SMS par destinataire, variables <span class="mono">{'{colonne}'}</span>, débit limité, pause / reprise / annulation (l'application doit rester ouverte).</span>
+      <span><strong>{t('mode.local')}</strong>{t('wz.custom_a')} <span class="mono">{t('wz.var_generic')}</span>{t('wz.custom_b')}</span>
     </label>
-    {#if hasVars}<div class="hint">Le message contient des variables : le mode Personnalisé est requis.</div>{/if}
+    {#if hasVars}<div class="hint">{t('wz.vars_required')}</div>{/if}
   </div>
 
   <div class="grid2">
     <div class="field">
-      <label for="csender">Expéditeur</label>
+      <label for="csender">{t('send.sender')}</label>
       <select id="csender" bind:value={sender}>
-        <option value="">Par défaut (numéro court)</option>
+        <option value="">{t('send.sender_default')}</option>
         {#each senders as s}<option value={s.name}>{s.name}</option>{/each}
       </select>
     </div>
     <div class="field">
-      <label for="crate">Débit (SMS / seconde)</label>
+      <label for="crate">{t('wz.rate')}</label>
       <input id="crate" type="number" min="0.2" max="20" step="0.5" bind:value={rate} disabled={mode !== 'local'} />
-      <div class="hint">Mode Personnalisé uniquement.</div>
+      <div class="hint">{t('wz.rate_hint')}</div>
     </div>
   </div>
 
   <div class="grid2">
     <div class="field">
-      <label class="check" for="csched"><input id="csched" type="checkbox" bind:checked={scheduled} /> Envoi différé</label>
-      <input type="datetime-local" bind:value={sendAt} disabled={!scheduled} aria-label="Date d'envoi différé" style="margin-top: 6px" />
+      <label class="check" for="csched"><input id="csched" type="checkbox" bind:checked={scheduled} /> {t('send.scheduled')}</label>
+      <input type="datetime-local" bind:value={sendAt} disabled={!scheduled} aria-label={t('send.scheduled_aria')} style="margin-top: 6px" />
     </div>
     <div class="field">
-      <label class="check" for="cstop"><input id="cstop" type="checkbox" bind:checked={stopClause} /> Mention « STOP » (SMS commercial)</label>
+      <label class="check" for="cstop"><input id="cstop" type="checkbox" bind:checked={stopClause} /> {t('wz.stop')}</label>
     </div>
   </div>
 </div>
@@ -224,19 +225,19 @@
 <div class="wz-right">
 {#if imp && template.trim()}
   <div class="card">
-    <h2>3. Simulation <span class="muted small">(dry-run : rien n'est envoyé)</span></h2>
+    <h2>{t('wz.s3')} <span class="muted small">{t('wz.dry')}</span></h2>
     {#if simulating}
-      <div class="muted">Simulation en cours… <span class="small">(appel n°{simCalls})</span></div>
+      <div class="muted">{t('wz.sim_running')}</div>
     {:else if !report}
-      <div class="alert warn" style="margin: 0 0 10px">La simulation n'a pas abouti{error ? ' : ' + error : '.'}</div>
-      <button onclick={rerun}>Relancer la simulation</button>
+      <div class="alert warn" style="margin: 0 0 10px">{t('wz.sim_failed')}{error ? t('wz.sim_failed_detail', { error }) : '.'}</div>
+      <button onclick={rerun}>{t('wz.rerun')}</button>
     {:else if report}
       <div class="small" style="margin-bottom: 10px">
-        <strong>{report.recipients}</strong> destinataire(s) valide(s)
-        {#if report.invalidCount}· <span style="color: var(--warn)">{report.invalidCount} ligne(s) ignorée(s)</span>{/if}
-        {#if report.dupes}· {report.dupes} doublon(s) ignoré(s){/if}
-        · mode <strong>{modeLabel[report.mode]}</strong>
-        {#if report.durationSeconds > 0}· durée estimée <strong>{duration(report.durationSeconds)}</strong>{/if}
+        <strong>{report.recipients}</strong> {t('wz.valid_recipients')}
+        {#if report.invalidCount}· <span style="color: var(--warn)">{t('wz.ignored_rows', { count: report.invalidCount })}</span>{/if}
+        {#if report.dupes}· {t('send.dupes', { count: report.dupes })}{/if}
+        · {t('wz.mode')} <strong>{modeLabel[report.mode]}</strong>
+        {#if report.durationSeconds > 0}· {t('wz.est_duration')} <strong>{duration(report.durationSeconds)}</strong>{/if}
       </div>
 
       {#each report.blocking as b}<div class="alert error" role="alert">{b}</div>{/each}
@@ -246,23 +247,23 @@
         <div class="cost">
           <div class="head">
             <div>
-              <div class="label">Prix estimé</div>
+              <div class="label">{t('send.price')}</div>
               <div class="price">{priceRange(report.priceMin, report.priceMax, report.currency)}</div>
-              <div class="small muted">HT · tarif public OVH selon le pack acheté</div>
+              <div class="small muted">{t('send.price_note')}</div>
             </div>
             <div class="credits">
-              <div class="label">Crédits</div>
+              <div class="label">{t('send.credits')}</div>
               <div class="big">{report.totalCredits}</div>
-              {#if ui.overview}<div class="small muted">solde : {ui.overview.creditsLeft}</div>{/if}
+              {#if ui.overview}<div class="small muted">{t('wz.balance', { credits: ui.overview.creditsLeft })}</div>{/if}
             </div>
           </div>
-          <div class="small muted detail">{report.totalParts} segment(s) au total</div>
+          <div class="small muted detail">{t('wz.total_segments', { count: report.totalParts })}</div>
           {#if report.lines.length > 1 || report.lines[0].creditsPerSms !== 1}
             <table class="small">
               <tbody>
                 {#each report.lines as l}
                   <tr><td class="mono">{l.country.toUpperCase()}</td>
-                    <td>{l.recipients} dest. × {l.creditsPerSms} cr./segment</td><td class="num">{l.credits} cr.</td></tr>
+                    <td>{t('wz.line', { recipients: l.recipients, rate: l.creditsPerSms })}</td><td class="num">{t('send.cr', { credits: l.credits })}</td></tr>
                 {/each}
               </tbody>
             </table>
@@ -272,11 +273,11 @@
 
       {#if sample}
         <div class="row between" style="margin-bottom: 6px">
-          <span class="label2">Aperçu {previewIdx + 1} / {report.samples.length} — <span class="mono">{sample.phone}</span>
-            <span class="badge">{sample.parts} segment(s)</span></span>
+          <span class="label2">{t('wz.preview', { i: previewIdx + 1, n: report.samples.length })} <span class="mono">{sample.phone}</span>
+            <span class="badge">{t('wz.segments_badge', { count: sample.parts })}</span></span>
           <span class="row" style="gap: 4px">
-            <button disabled={previewIdx === 0} onclick={() => previewIdx--} aria-label="Aperçu précédent">‹</button>
-            <button disabled={previewIdx >= report.samples.length - 1} onclick={() => previewIdx++} aria-label="Aperçu suivant">›</button>
+            <button disabled={previewIdx === 0} onclick={() => previewIdx--} aria-label={t('wz.prev')}>‹</button>
+            <button disabled={previewIdx >= report.samples.length - 1} onclick={() => previewIdx++} aria-label={t('wz.next')}>›</button>
           </span>
         </div>
         <blockquote>{sample.message}</blockquote>
@@ -284,10 +285,10 @@
 
       {#if report.invalid.length}
         <details style="margin-top: 12px">
-          <summary class="small muted">Lignes ignorées ({report.invalidCount})</summary>
+          <summary class="small muted">{t('wz.ignored_title', { count: report.invalidCount })}</summary>
           <ul class="small">
-            {#each report.invalid as i}<li>ligne {i.line} : « {i.value || 'vide'} »</li>{/each}
-            {#if report.invalidCount > report.invalid.length}<li>… et {report.invalidCount - report.invalid.length} autre(s)</li>{/if}
+            {#each report.invalid as i}<li>{t('wz.ignored_line', { line: i.line, value: i.value || t('wz.empty') })}</li>{/each}
+            {#if report.invalidCount > report.invalid.length}<li>{t('wz.and_more', { count: report.invalidCount - report.invalid.length })}</li>{/if}
           </ul>
         </details>
       {/if}
@@ -295,25 +296,25 @@
   </div>
 
   <div class="row" style="justify-content: flex-end; margin-bottom: 32px">
-    <button onclick={oncancel}>Annuler</button>
-    <button class="primary" disabled={!canLaunch} onclick={() => (confirming = true)}>Lancer la campagne…</button>
+    <button onclick={oncancel}>{t('common.cancel')}</button>
+    <button class="primary" disabled={!canLaunch} onclick={() => (confirming = true)}>{t('wz.launch')}</button>
   </div>
 {:else}
-  <div class="card ph muted">La simulation (coût, aperçu, durée) apparaîtra ici une fois le fichier choisi et le message rédigé.</div>
+  <div class="card ph muted">{t('wz.placeholder')}</div>
 {/if}
 </div>
 </div>
 
 {#if confirming && report}
-  <Confirm title="Lancer la campagne" confirmLabel="Lancer" busy={launching} onconfirm={launch} oncancel={() => (confirming = false)}>
+  <Confirm title={t('wz.confirm_title')} confirmLabel={t('wz.confirm_label')} busy={launching} onconfirm={launch} oncancel={() => (confirming = false)}>
     <p>
-      Envoyer <strong>« {name} »</strong> à <strong>{report.recipients} destinataire(s)</strong>
-      ({report.totalParts} segment(s), <strong>{report.totalCredits} crédit(s)</strong>
-      {#if report.priceMax > 0}, {priceRange(report.priceMin, report.priceMax, report.currency)} HT{/if})
-      en mode <strong>{modeLabel[report.mode]}</strong>
-      {#if scheduled && sendAt}, le {new Date(sendAt).toLocaleString('fr-FR')}{/if} ?
+      {t('wz.c_send')} <strong>{t('wz.quoted', { name })}</strong> {t('wz.c_to')} <strong>{t('send.to_recipients', { count: report.recipients })}</strong>
+      ({t('send.chars_segments', { count: report.totalParts })}, <strong>{t('app.credits_left', { count: report.totalCredits })}</strong>
+      {#if report.priceMax > 0}, {priceRange(report.priceMin, report.priceMax, report.currency)} {t('wz.excl_vat')}{/if})
+      {t('wz.c_in_mode')} <strong>{modeLabel[report.mode]}</strong>
+      {#if scheduled && sendAt}, {t('send.on_date', { date: dateTime(sendAt) })}{/if}{t('send.confirm_end')}
     </p>
-    <p class="muted small">Les SMS déjà envoyés ne peuvent pas être rappelés.</p>
+    <p class="muted small">{t('wz.c_note')}</p>
   </Confirm>
 {/if}
 

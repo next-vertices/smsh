@@ -3,12 +3,14 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"smsh/internal/creds"
+	"smsh/internal/i18n"
 	"smsh/internal/ovh"
 	"smsh/internal/sms"
 	"smsh/internal/store"
@@ -57,7 +59,7 @@ type SyncResult struct {
 func (s *Service) SyncHistory(ctx context.Context, days int) (SyncResult, error) {
 	res := SyncResult{Errors: []string{}}
 	if !s.syncMu.TryLock() {
-		return res, invalid("Une synchronisation est déjà en cours.")
+		return res, invalid("%s", i18n.T("svc.sync_running"))
 	}
 	defer s.syncMu.Unlock()
 	if days <= 0 {
@@ -281,7 +283,7 @@ func (s *Service) filterFor(accountID string, q HistoryQuery) (store.HistoryFilt
 		}
 		t, err := time.ParseInLocation("2006-01-02", v, time.Local)
 		if err != nil {
-			return nil, invalid("Date invalide : %q (attendu AAAA-MM-JJ).", v)
+			return nil, invalid("%s", i18n.T("svc.invalid_date", i18n.P{"value": fmt.Sprintf("%q", v)}))
 		}
 		return &t, nil
 	}
@@ -297,7 +299,7 @@ func (s *Service) filterFor(accountID string, q HistoryQuery) (store.HistoryFilt
 		f.To = &end
 	}
 	if f.From != nil && f.To != nil && f.To.Before(*f.From) {
-		return f, invalid("La date de fin précède la date de début.")
+		return f, invalid("%s", i18n.T("svc.date_order"))
 	}
 	return f, nil
 }
@@ -396,7 +398,7 @@ func (s *Service) DeleteHistory(ctx context.Context, ids []int64) (DeleteResult,
 		return res, nil
 	}
 	if len(ids) > maxDeleteBatch {
-		return res, invalid("Suppression limitée à %d SMS à la fois.", maxDeleteBatch)
+		return res, invalid("%s", i18n.T("svc.delete_limit", i18n.P{"max": maxDeleteBatch}))
 	}
 	acc, cl, err := s.historyCtx()
 	if err != nil {
@@ -419,7 +421,7 @@ func (s *Service) DeleteHistory(ctx context.Context, ids []int64) (DeleteResult,
 				mu.Unlock()
 				if skip {
 					mu.Lock()
-					res.Failed = append(res.Failed, DeleteFailure{ID: id, Error: "Interrompu (limite de débit ou erreur bloquante)."})
+					res.Failed = append(res.Failed, DeleteFailure{ID: id, Error: i18n.T("svc.delete_interrupted")})
 					mu.Unlock()
 					continue
 				}
@@ -445,7 +447,7 @@ func (s *Service) DeleteHistory(ctx context.Context, ids []int64) (DeleteResult,
 	wg.Wait()
 	res.Deleted = len(done)
 	if err := s.Store.DeleteHistory(ctx, acc.ID, done); err != nil {
-		return res, errors.Join(errors.New("SMS supprimés chez OVH mais cache local non mis à jour"), err)
+		return res, errors.Join(errors.New(i18n.T("svc.cache_not_updated")), err)
 	}
 	return res, nil
 }

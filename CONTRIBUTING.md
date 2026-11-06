@@ -27,7 +27,7 @@ N'utilisez **jamais** un vrai compte OVH pour développer ou tester : le mode `S
    gofmt -l .                      # ne doit rien afficher
    go vet ./...
    go test ./...
-   cd frontend; npm run check
+   cd frontend; npm run check      # types Svelte + cohérence des traductions
    ```
 4. Ouvrez la PR vers `main` en remplissant le modèle. Tant que la CI n'est pas verte, la PR ne peut pas être fusionnée.
 
@@ -40,6 +40,7 @@ N'utilisez **jamais** un vrai compte OVH pour développer ou tester : le mode `S
 - Les erreurs affichées à l'utilisateur sont **claires et en français** (voir `ovh.Error` et `service.Describe`).
 - Pas de nouvelle dépendance sans justification dans la PR (taille du binaire, licence compatible, maintenance). Pas de CGO.
 - L'interface doit rester utilisable au clavier et lisible dans les thèmes clair et sombre.
+- **Aucun texte affiché en dur** : toute chaîne visible passe par les catalogues de traduction (`t('clé')` côté interface, `i18n.T("clé")` côté Go), avec le français et l'anglais. Voir la section « Langues » du README.
 
 ## Relecture et fusion
 

@@ -3,6 +3,7 @@
   import Confirm from '../components/Confirm.svelte'
   import { api, ApiError, type Campaign, type CampaignRecipient } from '../lib/api'
   import { dateFr, modeLabel, statusLabel } from '../lib/format'
+  import { t } from '../lib/i18n.svelte'
 
   let { id, onback }: { id: string; onback: () => void } = $props()
 
@@ -45,8 +46,8 @@
       items = []
       refresh()
     })
-    const t = setInterval(() => { if (!c || active) refresh() }, POLL_MS)
-    return () => clearInterval(t)
+    const timer = setInterval(() => { if (!c || active) refresh() }, POLL_MS)
+    return () => clearInterval(timer)
   })
 
   async function more() {
@@ -74,14 +75,15 @@
   }
 
   const filters = [
-    { v: '', l: 'Tous' }, { v: 'sent', l: 'Envoyés' }, { v: 'failed', l: 'Échecs' }, { v: 'pending', l: 'En attente' },
+    { v: '', l: () => t('detail.f_all') }, { v: 'sent', l: () => t('detail.f_sent') },
+    { v: 'failed', l: () => t('detail.f_failed') }, { v: 'pending', l: () => t('detail.f_pending') },
   ]
-  const recLabel: Record<string, string> = { sent: 'Envoyé', failed: 'Échec', pending: 'En attente' }
+  const recLabel = (s: string) => (['sent', 'failed', 'pending'].includes(s) ? t(`rec.${s}`) : s)
 </script>
 
 <div class="row between" style="margin-bottom: 4px">
   <div>
-    <button class="link" onclick={onback}>← Campagnes</button>
+    <button class="link" onclick={onback}>{t('detail.back')}</button>
     <h1 style="margin-top: 6px">{c?.name ?? '…'}</h1>
   </div>
   {#if c}
@@ -105,68 +107,68 @@
       <div class="fill" style="width: {pct}%"></div>
     </div>
     <div class="row between" style="margin-top: 8px">
-      <span><strong>{done}</strong> / {c.total} traités · {pct} %</span>
-      <span class="muted small">créée le {dateFr(c.createdAt)}{#if c.sendAt} · envoi différé le {dateFr(c.sendAt)}{/if}</span>
+      <span><strong>{done}</strong> {t('detail.processed', { total: c.total, pct })}</span>
+      <span class="muted small">{t('detail.created', { date: dateFr(c.createdAt) })}{#if c.sendAt} · {t('detail.scheduled', { date: dateFr(c.sendAt) })}{/if}</span>
     </div>
 
     <div class="stats">
-      <div><div class="n ok">{c.sent}</div><div class="label2">Envoyés</div></div>
-      <div><div class="n bad">{c.failed}</div><div class="label2">Échecs</div></div>
-      <div><div class="n">{pending}</div><div class="label2">Restants</div></div>
-      <div><div class="n">{c.credits}</div><div class="label2">Crédits</div></div>
+      <div><div class="n ok">{c.sent}</div><div class="label2">{t('detail.s_sent')}</div></div>
+      <div><div class="n bad">{c.failed}</div><div class="label2">{t('detail.s_failed')}</div></div>
+      <div><div class="n">{pending}</div><div class="label2">{t('detail.s_remaining')}</div></div>
+      <div><div class="n">{c.credits}</div><div class="label2">{t('detail.s_credits')}</div></div>
     </div>
 
     <div class="row wrap" style="margin-top: 14px">
       {#if isLocal && c.status === 'running'}
-        <button disabled={busy} onclick={() => act(() => api.pauseCampaign(id))}>Pause</button>
+        <button disabled={busy} onclick={() => act(() => api.pauseCampaign(id))}>{t('detail.pause')}</button>
       {/if}
       {#if isLocal && (c.status === 'paused' || c.status === 'pending')}
-        <button class="primary" disabled={busy} onclick={() => act(() => api.resumeCampaign(id))}>Reprendre</button>
+        <button class="primary" disabled={busy} onclick={() => act(() => api.resumeCampaign(id))}>{t('detail.resume')}</button>
       {/if}
       {#if isLocal && c.failed > 0 && c.status !== 'running' && c.status !== 'canceled'}
-        <button disabled={busy} onclick={() => act(() => api.retryFailed(id))}>Relancer les {c.failed} échec(s)</button>
+        <button disabled={busy} onclick={() => act(() => api.retryFailed(id))}>{t('detail.retry', { count: c.failed })}</button>
       {/if}
       {#if active}
-        <button class="danger" disabled={busy} onclick={() => (confirm = 'cancel')}>Annuler la campagne</button>
+        <button class="danger" disabled={busy} onclick={() => (confirm = 'cancel')}>{t('detail.cancel')}</button>
       {:else}
-        <button class="danger" disabled={busy} onclick={() => (confirm = 'delete')}>Supprimer</button>
+        <button class="danger" disabled={busy} onclick={() => (confirm = 'delete')}>{t('detail.delete')}</button>
       {/if}
     </div>
     {#if !isLocal && active}
-      <div class="hint">OVH gère l'envoi : vous pouvez fermer l'application. L'annulation n'est possible que pour un batch différé.</div>
+      <div class="hint">{t('detail.ovh_hint')}</div>
     {/if}
   </div>
 
   {#if isLocal}
     <div class="card">
       <div class="row between" style="margin-bottom: 10px">
-        <h2 style="margin: 0">Destinataires</h2>
+        <h2 style="margin: 0">{t('detail.recipients')}</h2>
         <div class="row" style="gap: 4px">
           {#each filters as f}
-            <button class:primary={filter === f.v} onclick={() => (filter = f.v)}>{f.l}</button>
+            <button class:primary={filter === f.v} onclick={() => (filter = f.v)}>{f.l()}</button>
           {/each}
         </div>
       </div>
       <div class="tablewrap">
         <table class="data">
-          <thead><tr><th>Numéro</th><th>Statut</th><th>Message</th><th>Détail</th></tr></thead>
+          <thead><tr><th>{t('detail.th_number')}</th><th>{t('detail.th_status')}</th><th>{t('detail.th_message')}</th><th>{t('detail.th_detail')}</th></tr></thead>
           <tbody>
             {#each items as r (r.idx)}
               <tr>
                 <td class="mono">{r.phone}</td>
-                <td><span class="st {r.status}">{recLabel[r.status] ?? r.status}</span></td>
+                <td><span class="st {r.status}">{recLabel(r.status)}</span></td>
                 <td class="msg" title={r.message}>{r.message}</td>
-                <td class="small muted">{r.error || (r.ovhId ? `ID ${r.ovhId}` : '')}</td>
+                <td class="small muted">{r.error || (r.ovhId ? t('detail.ovh_id', { id: r.ovhId }) : '')}</td>
               </tr>
             {:else}
-              <tr><td colspan="4" class="muted">Aucun destinataire.</td></tr>
+              <tr><td colspan="4" class="muted">{t('detail.none')}</td></tr>
             {/each}
           </tbody>
         </table>
       </div>
       {#if items.length < total}
         <div class="row" style="justify-content: center; margin-top: 10px">
-          <button onclick={more}>Afficher plus ({total - items.length} restants)</button>
+          <button onclick={more}>{t('detail.show_more', { count: total - items.length })}</button>
         </div>
       {/if}
     </div>
@@ -176,13 +178,13 @@
 
 {#if confirm && c}
   <Confirm
-    title={confirm === 'cancel' ? 'Annuler la campagne' : 'Supprimer la campagne'}
-    confirmLabel={confirm === 'cancel' ? 'Annuler la campagne' : 'Supprimer'}
+    title={confirm === 'cancel' ? t('detail.cancel_title') : t('detail.delete_title')}
+    confirmLabel={confirm === 'cancel' ? t('detail.cancel') : t('detail.delete')}
     danger {busy} onconfirm={confirmed} oncancel={() => (confirm = null)}>
     {#if confirm === 'cancel'}
-      <p>Annuler <strong>{c.name}</strong> ? Les {pending} destinataire(s) restant(s) ne recevront pas le message. Les SMS déjà envoyés ne peuvent pas être rappelés.</p>
+      <p>{t('detail.cancel_pre')} <strong>{c.name}</strong>{t('detail.cancel_post', { pending })}</p>
     {:else}
-      <p>Supprimer <strong>{c.name}</strong> de l'historique local ? Rien n'est supprimé chez OVH. Cette action est irréversible.</p>
+      <p>{t('detail.delete_pre')} <strong>{c.name}</strong> {t('detail.delete_post')}</p>
     {/if}
   </Confirm>
 {/if}

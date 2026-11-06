@@ -13,6 +13,7 @@ import (
 
 	"smsh/internal/campaign"
 	"smsh/internal/creds"
+	"smsh/internal/i18n"
 	"smsh/internal/ovh"
 	"smsh/internal/sms"
 	"smsh/internal/store"
@@ -79,14 +80,14 @@ func newID() string {
 func (s *Service) ImportCSV(path string) (ImportInfo, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
-		return ImportInfo{}, invalid("Fichier illisible : %v", err)
+		return ImportInfo{}, invalid("%s", i18n.T("svc.file_unreadable", i18n.P{"error": err.Error()}))
 	}
 	if fi.Size() > maxImportBytes {
-		return ImportInfo{}, invalid("Fichier trop volumineux (%d Mo maximum).", maxImportBytes>>20)
+		return ImportInfo{}, invalid("%s", i18n.T("svc.file_too_big", i18n.P{"mb": maxImportBytes >> 20}))
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return ImportInfo{}, invalid("Fichier illisible : %v", err)
+		return ImportInfo{}, invalid("%s", i18n.T("svc.file_unreadable", i18n.P{"error": err.Error()}))
 	}
 	t, err := campaign.ParseCSV(data)
 	if err != nil {
@@ -157,7 +158,7 @@ func (s *Service) makePlan(ctx context.Context, in PlanInput) (plan, error) {
 	s.logf("simulate: début (mode=%q)", in.Mode)
 	t, ok := s.imports.get(in.ImportID)
 	if !ok {
-		return p, invalid("Fichier CSV non chargé : importez-le à nouveau.")
+		return p, invalid("%s", i18n.T("svc.csv_not_loaded"))
 	}
 	contacts, err := campaign.ExtractContacts(t, in.PhoneColumn)
 	if err != nil {
@@ -167,14 +168,14 @@ func (s *Service) makePlan(ctx context.Context, in PlanInput) (plan, error) {
 	r.Recipients, r.Dupes, r.InvalidCount = len(contacts.Valid), contacts.Dupes, len(contacts.Invalid)
 	r.Invalid = append(r.Invalid, contacts.Invalid[:min(len(contacts.Invalid), issueCount)]...) // jamais nil : le front itère dessus
 	if r.InvalidCount > 0 {
-		r.Warnings = append(r.Warnings, fmt.Sprintf("%d ligne(s) ignorée(s) : numéro invalide.", r.InvalidCount))
+		r.Warnings = append(r.Warnings, i18n.T("svc.rows_ignored", i18n.P{"count": r.InvalidCount}))
 	}
 	if r.Recipients == 0 {
-		r.Blocking = append(r.Blocking, "Aucun destinataire valide dans le fichier.")
+		r.Blocking = append(r.Blocking, i18n.T("svc.no_valid_recipient"))
 	}
 
 	if strings.TrimSpace(in.Template) == "" {
-		r.Blocking = append(r.Blocking, "Le message est vide.")
+		r.Blocking = append(r.Blocking, i18n.T("svc.message_empty"))
 		return p, nil
 	}
 	vars := campaign.Variables(in.Template)
@@ -187,7 +188,7 @@ func (s *Service) makePlan(ctx context.Context, in PlanInput) (plan, error) {
 	r.Mode = in.Mode
 	switch {
 	case len(vars) > 0 && r.Mode == store.ModeBatch:
-		r.Blocking = append(r.Blocking, "Le batch OVH n'accepte pas de variables : choisissez le mode « Personnalisé ».")
+		r.Blocking = append(r.Blocking, i18n.T("svc.batch_no_vars"))
 	case r.Mode == "":
 		r.Mode = store.ModeBatch
 		if len(vars) > 0 {
@@ -207,7 +208,7 @@ func (s *Service) makePlan(ctx context.Context, in PlanInput) (plan, error) {
 			}
 		}
 		if strings.TrimSpace(msg) == "" {
-			r.Warnings = append(r.Warnings, fmt.Sprintf("Message vide pour %s : ce destinataire échouera.", c.Phone))
+			r.Warnings = append(r.Warnings, i18n.T("svc.empty_message_for", i18n.P{"phone": c.Phone}))
 		}
 		an := sms.Analyze(msg)
 		if r.Mode == store.ModeLocal {
@@ -237,32 +238,32 @@ func (s *Service) makePlan(ctx context.Context, in PlanInput) (plan, error) {
 		return p, nil
 	}
 	if r.MaxParts > 1 {
-		r.Warnings = append(r.Warnings, fmt.Sprintf("Certains messages dépassent un segment (jusqu'à %d) : chaque segment est facturé.", r.MaxParts))
+		r.Warnings = append(r.Warnings, i18n.T("svc.multi_segment", i18n.P{"max": r.MaxParts}))
 	}
 	if in.StopClause {
-		r.Warnings = append(r.Warnings, "La mention STOP ajoutée par OVH n'est pas comptée dans les segments estimés.")
+		r.Warnings = append(r.Warnings, i18n.T("svc.stop_not_counted"))
 	}
 	if r.UnknownCountry > 0 {
-		r.Warnings = append(r.Warnings, fmt.Sprintf("%d numéro(s) d'un pays non reconnu : coût non estimé.", r.UnknownCountry))
+		r.Warnings = append(r.Warnings, i18n.T("svc.unknown_country", i18n.P{"count": r.UnknownCountry}))
 	}
 
 	s.logf("simulate: messages rendus (%d destinataires)", r.Recipients)
 	// Tarifs : nécessitent un compte actif ; une indisponibilité n'empêche pas la simulation.
 	if a, sec, err := s.Creds.Active(); err != nil {
-		r.Warnings = append(r.Warnings, "Coût non estimé : aucun compte accessible.")
+		r.Warnings = append(r.Warnings, i18n.T("svc.cost_no_account"))
 	} else if cl, err := s.NewClient(toOVH(a, sec)); err == nil {
 		s.logf("simulate: client créé, tarifs…")
 		pr, err := s.priceLines(ctx, cl, agg)
 		s.logf("simulate: tarifs terminés (err=%v)", err)
 		if err != nil {
-			r.Warnings = append(r.Warnings, "Coût non estimé : "+err.Error())
+			r.Warnings = append(r.Warnings, i18n.T("svc.cost_error", i18n.P{"error": err.Error()}))
 		} else {
 			r.Lines, r.TotalCredits, r.PriceMin, r.PriceMax, r.Currency = pr.Lines, pr.TotalCredits, pr.PriceMin, pr.PriceMax, pr.Currency
 			s.logf("simulate: solde…")
 			ai, aerr := cl.Account(ctx, a.ServiceName)
 			s.logf("simulate: solde terminé (err=%v)", aerr)
 			if a := ai; aerr == nil && r.TotalCredits > a.CreditsLeft {
-				r.Blocking = append(r.Blocking, fmt.Sprintf("Crédits insuffisants : %v nécessaires, %v disponibles.", r.TotalCredits, a.CreditsLeft))
+				r.Blocking = append(r.Blocking, i18n.T("svc.insufficient", i18n.P{"needed": r.TotalCredits, "available": a.CreditsLeft}))
 			}
 		}
 	}
@@ -300,7 +301,7 @@ type LaunchInput struct {
 func (s *Service) LaunchCampaign(ctx context.Context, in LaunchInput) (store.Campaign, error) {
 	name := strings.TrimSpace(in.Name)
 	if name == "" {
-		return store.Campaign{}, invalid("Donnez un nom à la campagne.")
+		return store.Campaign{}, invalid("%s", i18n.T("svc.name_required"))
 	}
 	p, err := s.makePlan(ctx, in.PlanInput)
 	if err != nil {
@@ -344,7 +345,7 @@ func (s *Service) LaunchCampaign(ctx context.Context, in LaunchInput) (store.Cam
 		}
 		c.BatchID, c.Status, c.Credits = b.ID, store.StatusRunning, b.EstimatedCredits
 		if err := s.Store.CreateCampaign(ctx, c, nil); err != nil {
-			return store.Campaign{}, fmt.Errorf("batch OVH %s créé mais non enregistré localement : %w", b.ID, err)
+			return store.Campaign{}, fmt.Errorf("%s: %w", i18n.T("svc.batch_not_saved", i18n.P{"id": b.ID}), err)
 		}
 		return c, nil
 	}
@@ -366,7 +367,7 @@ func (s *Service) LaunchCampaign(ctx context.Context, in LaunchInput) (store.Cam
 func (s *Service) sendCampaignMessage(ctx context.Context, c store.Campaign, r store.Recipient) (ovh.SendResult, error) {
 	acc, sec, err := s.Creds.Load(c.AccountID)
 	if err != nil {
-		return ovh.SendResult{}, &ovh.Error{Kind: ovh.KindCredentials, Message: "Compte de la campagne indisponible : " + err.Error(), Err: err}
+		return ovh.SendResult{}, &ovh.Error{Kind: ovh.KindCredentials, Message: i18n.T("svc.campaign_account_unavailable", i18n.P{"error": err.Error()}), Err: err}
 	}
 	cl, err := s.NewClient(toOVH(acc, sec))
 	if err != nil {
@@ -511,7 +512,7 @@ func (s *Service) PauseCampaign(ctx context.Context, id string) error {
 		return err
 	}
 	if c.Mode == store.ModeBatch {
-		return invalid("Un batch OVH ne peut pas être mis en pause : vous pouvez l'annuler s'il est différé.")
+		return invalid("%s", i18n.T("svc.batch_no_pause"))
 	}
 	return s.Runner.Pause(id)
 }
@@ -550,10 +551,10 @@ func (s *Service) RetryFailed(ctx context.Context, id string) (int, error) {
 		return 0, err
 	}
 	if c.Mode != store.ModeLocal {
-		return 0, invalid("Seules les campagnes en mode « Personnalisé » peuvent être relancées.")
+		return 0, invalid("%s", i18n.T("svc.retry_only_custom"))
 	}
 	if s.Runner.Running(id) || c.Status == store.StatusCanceled {
-		return 0, invalid("Mettez la campagne en pause avant de relancer les échecs.")
+		return 0, invalid("%s", i18n.T("svc.pause_first"))
 	}
 	n, err := s.Store.RetryFailed(ctx, id)
 	if err != nil || n == 0 {
@@ -572,7 +573,7 @@ func (s *Service) DeleteCampaign(ctx context.Context, id string) error {
 		return err
 	}
 	if s.Runner.Running(id) || (c.Mode == store.ModeBatch && store.Active(c.Status)) {
-		return invalid("La campagne est en cours : annulez-la ou attendez sa fin avant de la supprimer.")
+		return invalid("%s", i18n.T("svc.campaign_running"))
 	}
 	return s.Store.DeleteCampaign(ctx, id)
 }

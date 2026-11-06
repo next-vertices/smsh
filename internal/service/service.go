@@ -5,13 +5,13 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"smsh/internal/campaign"
 	"smsh/internal/creds"
+	"smsh/internal/i18n"
 	"smsh/internal/ovh"
 	"smsh/internal/sms"
 	"smsh/internal/store"
@@ -98,8 +98,7 @@ func (s *Service) TestConnection(ctx context.Context, in creds.Input) (ServiceIn
 	if errors.As(err, &oe) && oe.Kind == ovh.KindCredentials {
 		// Diagnostic sans fuite : seules les longueurs sont affichées.
 		return info, &ovh.Error{Kind: oe.Kind, Status: oe.Status, Err: oe.Err,
-			Message: fmt.Sprintf("%s [longueurs reçues : application key=%d, secret=%d, consumer key=%d ; attendu 16/32/32]",
-				oe.Message, len(sec.AppKey), len(sec.AppSecret), len(sec.ConsumerKey))}
+			Message: i18n.T("svc.diag_lengths", i18n.P{"message": oe.Message, "app": len(sec.AppKey), "secret": len(sec.AppSecret), "consumer": len(sec.ConsumerKey)})}
 	}
 	return info, err
 }
@@ -142,26 +141,25 @@ func (s *Service) parseSendAt(v string) (*time.Time, error) {
 			return &t, nil
 		}
 	}
-	return nil, &ovh.Error{Kind: ovh.KindInvalidRequest, Message: "Date d'envoi différé invalide."}
+	return nil, &ovh.Error{Kind: ovh.KindInvalidRequest, Message: i18n.T("svc.send_at_invalid")}
 }
 
 // Send envoie un SMS one-shot via le compte actif.
 func (s *Service) Send(ctx context.Context, in SendInput) (SendOutcome, error) {
 	if strings.TrimSpace(in.Message) == "" {
-		return SendOutcome{}, &ovh.Error{Kind: ovh.KindInvalidRequest, Message: "Le message est vide."}
+		return SendOutcome{}, &ovh.Error{Kind: ovh.KindInvalidRequest, Message: i18n.T("svc.message_empty")}
 	}
 	rcpt := sms.ParseReceivers(in.Recipients)
 	if len(rcpt.Invalid) > 0 {
 		return SendOutcome{}, &ovh.Error{Kind: ovh.KindInvalidReceiver,
-			Message: "Numéro(s) invalide(s) : " + strings.Join(rcpt.Invalid, ", ")}
+			Message: i18n.T("svc.invalid_numbers", i18n.P{"numbers": strings.Join(rcpt.Invalid, ", ")})}
 	}
 	if len(rcpt.Valid) == 0 {
-		return SendOutcome{}, &ovh.Error{Kind: ovh.KindInvalidReceiver, Message: "Aucun destinataire."}
+		return SendOutcome{}, &ovh.Error{Kind: ovh.KindInvalidReceiver, Message: i18n.T("svc.no_recipient")}
 	}
 	if len(rcpt.Valid) > MaxOneShotRecipients {
 		return SendOutcome{}, &ovh.Error{Kind: ovh.KindInvalidRequest,
-			Message: fmt.Sprintf("Un envoi unitaire est limité à %d destinataires (%d saisis) : utilisez une campagne.",
-				MaxOneShotRecipients, len(rcpt.Valid))}
+			Message: i18n.T("svc.too_many_recipients", i18n.P{"max": MaxOneShotRecipients, "got": len(rcpt.Valid)})}
 	}
 	at, err := s.parseSendAt(in.SendAt)
 	if err != nil {
@@ -208,21 +206,21 @@ func Describe(err error) Problem {
 	var oe *ovh.Error
 	switch {
 	case errors.Is(err, creds.ErrLocked):
-		return Problem{"locked", "Le coffre est verrouillé : saisissez la passphrase."}
+		return Problem{"locked", i18n.T("svc.locked")}
 	case errors.Is(err, creds.ErrBadPassphrase):
-		return Problem{"bad_passphrase", "Passphrase incorrecte."}
+		return Problem{"bad_passphrase", i18n.T("svc.bad_passphrase")}
 	case errors.Is(err, creds.ErrWeakPassphase):
-		return Problem{"validation", err.Error()}
+		return Problem{"validation", i18n.T("creds.weak_passphrase")}
 	case errors.Is(err, store.ErrNotFound):
-		return Problem{"not_found", "Campagne introuvable."}
+		return Problem{"not_found", i18n.T("svc.campaign_not_found")}
 	case errors.Is(err, creds.ErrNoAccount):
-		return Problem{"no_account", "Aucun compte OVH configuré."}
+		return Problem{"no_account", i18n.T("svc.no_account")}
 	case errors.As(err, &ve):
 		return Problem{"validation", ve.Msg}
 	case errors.As(err, &oe):
 		return Problem{string(oe.Kind), oe.Message}
 	default:
-		return Problem{"internal", fmt.Sprintf("Erreur interne : %v", err)}
+		return Problem{"internal", i18n.T("svc.internal", i18n.P{"error": err.Error()})}
 	}
 }
 

@@ -3,10 +3,10 @@ package campaign
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
+	"smsh/internal/i18n"
 	"smsh/internal/ovh"
 	"smsh/internal/store"
 )
@@ -77,10 +77,10 @@ func (r *Runner) Start(id string) error {
 		return err
 	}
 	if c.Mode != store.ModeLocal {
-		return errors.New("cette campagne est gérée par OVH (batch)")
+		return errors.New(i18n.T("camp.is_batch"))
 	}
 	if c.Status != store.StatusPending && c.Status != store.StatusPaused {
-		return fmt.Errorf("impossible de lancer une campagne au statut « %s »", c.Status)
+		return errors.New(i18n.T("camp.cannot_start", i18n.P{"status": c.Status}))
 	}
 	if err := r.Store.SetStatus(ctx, id, store.StatusRunning, ""); err != nil {
 		return err
@@ -115,7 +115,7 @@ func (r *Runner) stop(id string, cause error, status string) error {
 		return err
 	}
 	if !store.Active(c.Status) {
-		return fmt.Errorf("la campagne est déjà terminée (%s)", c.Status)
+		return errors.New(i18n.T("camp.already_done", i18n.P{"status": c.Status}))
 	}
 	return r.Store.SetStatus(context.Background(), id, status, "")
 }
@@ -174,7 +174,7 @@ func (r *Runner) execute(ctx context.Context, c store.Campaign) (string, string)
 		}
 		rs, err := r.Store.NextPending(bg, c.ID, 1)
 		if err != nil {
-			return store.StatusPaused, "Erreur base de données : " + err.Error()
+			return store.StatusPaused, i18n.T("camp.db_error", i18n.P{"error": err.Error()})
 		}
 		if len(rs) == 0 {
 			return store.StatusCompleted, ""
@@ -204,7 +204,7 @@ func (r *Runner) sendOne(ctx context.Context, c store.Campaign, rec store.Recipi
 		res, err := r.Send(context.WithoutCancel(ctx), c, rec)
 		if err == nil {
 			if len(res.ValidReceivers) == 0 && len(res.IDs) == 0 || contains(res.InvalidReceivers, rec.Phone) {
-				_ = r.Store.MarkRecipient(bg, c.ID, rec.Idx, store.RecipientFailed, "Numéro refusé par OVH", 0, 0)
+				_ = r.Store.MarkRecipient(bg, c.ID, rec.Idx, store.RecipientFailed, i18n.T("camp.number_refused"), 0, 0)
 				return "", "", true
 			}
 			var id int64

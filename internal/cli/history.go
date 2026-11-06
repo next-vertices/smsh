@@ -11,20 +11,27 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"smsh/internal/i18n"
 	"smsh/internal/service"
 )
 
-var statusLabel = map[string]string{"delivered": "Délivré", "sent": "Envoyé", "scheduled": "Programmé"}
+func statusLabel(s string) string {
+	switch s {
+	case "delivered", "sent", "scheduled":
+		return i18n.T("cli.st_" + s)
+	}
+	return s
+}
 
 // filterFlags déclare les filtres communs à « ls » et « rm --match ».
 func filterFlags(f *pflag.FlagSet, q *service.HistoryQuery) {
-	f.StringVarP(&q.Query, "query", "q", "", "texte recherché (message, numéro, expéditeur)")
-	f.StringVar(&q.Receiver, "to", "", "destinataire")
+	f.StringVarP(&q.Query, "query", "q", "", i18n.T("cli.fl_query"))
+	f.StringVar(&q.Receiver, "to", "", i18n.T("cli.fl_to"))
 	f.StringVar(&q.Status, "status", "", "delivered | sent | scheduled")
-	f.StringVar(&q.Sender, "sender", "", "expéditeur")
-	f.StringVar(&q.Tag, "tag", "", "tag (ID de campagne Smsh)")
-	f.StringVar(&q.DateFrom, "from", "", "à partir du (AAAA-MM-JJ)")
-	f.StringVar(&q.DateTo, "until", "", "jusqu'au (AAAA-MM-JJ), inclus")
+	f.StringVar(&q.Sender, "sender", "", i18n.T("cli.fl_sender_f"))
+	f.StringVar(&q.Tag, "tag", "", i18n.T("cli.fl_tag"))
+	f.StringVar(&q.DateFrom, "from", "", i18n.T("cli.fl_from"))
+	f.StringVar(&q.DateTo, "until", "", i18n.T("cli.fl_until"))
 }
 
 // syncHistory télécharge les nouveaux SMS jusqu'à épuisement, avec progression sur stderr.
@@ -41,7 +48,7 @@ func syncHistory(ctx context.Context, svc *service.Service, days int) (service.S
 		total.Remaining = res.Remaining
 		total.Errors = append(total.Errors, res.Errors...)
 		if !asJSON {
-			fmt.Fprintf(os.Stderr, "\rSynchronisation : %d téléchargé(s), %d restant(s)…   ", total.Fetched, res.Remaining)
+			fmt.Fprint(os.Stderr, i18n.T("cli.sync_progress", i18n.P{"fetched": total.Fetched, "remaining": res.Remaining}))
 		}
 		if res.Remaining == 0 || res.Fetched == 0 || ctx.Err() != nil {
 			break
@@ -57,7 +64,7 @@ func syncCmd() *cobra.Command {
 	var days int
 	c := &cobra.Command{
 		Use:   "sync",
-		Short: "Met à jour le cache local de l'historique depuis OVH",
+		Short: i18n.T("cli.sync_short"),
 		Args:  exactly(0),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return withService(func(ctx context.Context, svc *service.Service) error {
@@ -68,20 +75,19 @@ func syncCmd() *cobra.Command {
 				if asJSON {
 					printJSON(os.Stdout, res)
 				} else {
-					fmt.Printf("%d SMS connus d'OVH sur %d jours, %d téléchargé(s), %d supprimé(s) du cache, %d restant(s).\n",
-						res.Listed, days, res.Fetched, res.Removed, res.Remaining)
+					fmt.Println(i18n.T("cli.sync_done", i18n.P{"listed": res.Listed, "days": days, "fetched": res.Fetched, "removed": res.Removed, "remaining": res.Remaining}))
 					for _, e := range res.Errors {
 						fmt.Fprintln(os.Stderr, "  ! "+e)
 					}
 				}
 				if len(res.Errors) > 0 {
-					return failf("%d erreur(s) pendant la synchronisation", len(res.Errors))
+					return failf("%s", i18n.T("cli.sync_errors", i18n.P{"count": len(res.Errors)}))
 				}
 				return nil
 			})
 		},
 	}
-	c.Flags().IntVar(&days, "days", 30, "nombre de jours à synchroniser")
+	c.Flags().IntVar(&days, "days", 30, i18n.T("cli.fl_days_sync"))
 	return c
 }
 
@@ -94,7 +100,7 @@ func lsCmd() *cobra.Command {
 	)
 	c := &cobra.Command{
 		Use:   "ls",
-		Short: "Liste les SMS envoyés (cache local, du plus récent au plus ancien)",
+		Short: i18n.T("cli.ls_short"),
 		Example: `  smsh ls --limit 50
   smsh ls --sync --to 0612345678
   smsh ls --status sent --from 2026-11-01 --json`,
@@ -115,30 +121,29 @@ func lsCmd() *cobra.Command {
 					return nil
 				}
 				tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-				fmt.Fprintln(tw, "ID\tDATE\tDESTINATAIRE\tSTATUT\tCR.\tMESSAGE")
+				fmt.Fprintln(tw, i18n.T("cli.th_ls"))
 				for _, h := range page.Items {
 					msg := trunc(h.Message, 60)
 					if full {
 						msg = trunc(h.Message, 0)
 					}
-					fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%v\t%s\n", h.ID, dateFr(h.CreatedAt), h.Receiver, statusLabel[h.Status], h.Credits, msg)
+					fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%v\t%s\n", h.ID, dateFr(h.CreatedAt), h.Receiver, statusLabel(h.Status), h.Credits, msg)
 				}
 				if err := tw.Flush(); err != nil {
 					return err
 				}
-				fmt.Fprintf(os.Stderr, "%d–%d sur %d SMS · %v crédit(s) au total\n",
-					min(off+1, page.Total), off+len(page.Items), page.Total, page.Credits)
+				fmt.Fprintln(os.Stderr, i18n.T("cli.ls_footer", i18n.P{"from": min(off+1, page.Total), "to": off + len(page.Items), "total": page.Total, "credits": page.Credits}))
 				return nil
 			})
 		},
 	}
 	filterFlags(c.Flags(), &q)
 	f := c.Flags()
-	f.IntVarP(&limit, "limit", "n", 20, "nombre de lignes")
-	f.IntVar(&off, "offset", 0, "ignorer les N premières lignes")
-	f.BoolVar(&doSync, "sync", false, "synchroniser l'historique avant d'afficher")
-	f.IntVar(&days, "days", 7, "jours à synchroniser avec --sync")
-	f.BoolVar(&full, "full", false, "ne pas tronquer les messages")
+	f.IntVarP(&limit, "limit", "n", 20, i18n.T("cli.fl_limit"))
+	f.IntVar(&off, "offset", 0, i18n.T("cli.fl_offset"))
+	f.BoolVar(&doSync, "sync", false, i18n.T("cli.fl_sync"))
+	f.IntVar(&days, "days", 7, i18n.T("cli.fl_days_ls"))
+	f.BoolVar(&full, "full", false, i18n.T("cli.fl_full"))
 	return c
 }
 
@@ -150,19 +155,19 @@ func rmCmd() *cobra.Command {
 		dry   bool
 	)
 	c := &cobra.Command{
-		Use:   "rm <id>... | --match [filtres]",
-		Short: "Supprime des SMS de l'historique chez OVH et dans le cache local",
+		Use:   i18n.T("cli.rm_usage"),
+		Short: i18n.T("cli.rm_short"),
 		Example: `  smsh rm 12345 12346
   smsh rm --match --status sent --until 2026-09-30 --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if match == (len(args) > 0) {
-				return usagef("indiquez soit des identifiants, soit --match avec des filtres")
+				return usagef("%s", i18n.T("cli.rm_need"))
 			}
 			return withService(func(ctx context.Context, svc *service.Service) error {
 				var ids []int64
 				if match {
 					if q == (service.HistoryQuery{}) {
-						return usagef("--match exige au moins un filtre (--query, --to, --status, --sender, --tag, --from, --until)")
+						return usagef("%s", i18n.T("cli.rm_need_filter"))
 					}
 					var err error
 					if ids, err = svc.HistoryMatchingIDs(ctx, q); err != nil {
@@ -172,7 +177,7 @@ func rmCmd() *cobra.Command {
 					for _, a := range args {
 						n, err := strconv.ParseInt(a, 10, 64)
 						if err != nil {
-							return usagef("identifiant invalide : %q", a)
+							return usagef("%s", i18n.T("cli.rm_bad_id", i18n.P{"id": fmt.Sprintf("%q", a)}))
 						}
 						ids = append(ids, n)
 					}
@@ -181,15 +186,15 @@ func rmCmd() *cobra.Command {
 					if asJSON {
 						printJSON(os.Stdout, service.DeleteResult{Failed: []service.DeleteFailure{}})
 					} else {
-						fmt.Println("Aucun SMS à supprimer.")
+						fmt.Println(i18n.T("cli.rm_none"))
 					}
 					return nil
 				}
 				if dry {
-					fmt.Fprintf(os.Stderr, "Simulation : %d SMS seraient supprimés.\n", len(ids))
+					fmt.Fprintln(os.Stderr, i18n.T("cli.rm_dry", i18n.P{"count": len(ids)}))
 					return nil
 				}
-				if err := confirm(fmt.Sprintf("Supprimer définitivement %d SMS chez OVH ?", len(ids)), yes); err != nil {
+				if err := confirm(i18n.T("cli.rm_confirm", i18n.P{"count": len(ids)}), yes); err != nil {
 					return err
 				}
 				cctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
@@ -198,7 +203,7 @@ func rmCmd() *cobra.Command {
 				if asJSON {
 					printJSON(os.Stdout, res)
 				} else {
-					fmt.Printf("%d SMS supprimé(s).\n", res.Deleted)
+					fmt.Println(i18n.T("cli.rm_done", i18n.P{"count": res.Deleted}))
 					for _, f := range res.Failed {
 						fmt.Fprintf(os.Stderr, "  ! %d : %s\n", f.ID, f.Error)
 					}
@@ -207,15 +212,15 @@ func rmCmd() *cobra.Command {
 					return err
 				}
 				if len(res.Failed) > 0 {
-					return failf("%d suppression(s) en échec", len(res.Failed))
+					return failf("%s", i18n.T("cli.rm_failed", i18n.P{"count": len(res.Failed)}))
 				}
 				return nil
 			})
 		},
 	}
 	filterFlags(c.Flags(), &q)
-	c.Flags().BoolVar(&match, "match", false, "supprimer tous les SMS correspondant aux filtres")
-	c.Flags().BoolVarP(&yes, "yes", "y", false, "ne pas demander de confirmation")
-	c.Flags().BoolVar(&dry, "dry-run", false, "compter sans supprimer")
+	c.Flags().BoolVar(&match, "match", false, i18n.T("cli.fl_match"))
+	c.Flags().BoolVarP(&yes, "yes", "y", false, i18n.T("cli.fl_yes"))
+	c.Flags().BoolVar(&dry, "dry-run", false, i18n.T("cli.fl_dry_count"))
 	return c
 }

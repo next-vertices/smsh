@@ -5,6 +5,7 @@
   import { api, ApiError, type Campaign } from '../lib/api'
   import { refreshOverview } from '../lib/actions'
   import { dateFr, modeLabel, statusLabel } from '../lib/format'
+  import { t } from '../lib/i18n.svelte'
 
   type Screen = { name: 'list' } | { name: 'new' } | { name: 'detail'; id: string }
   let screen = $state<Screen>({ name: 'list' })
@@ -55,10 +56,10 @@
   <CampaignDetail id={screen.id} onback={() => { refreshOverview(); screen = { name: 'list' } }} />
 {:else}
   <div class="row between" style="margin-bottom: 4px">
-    <h1>Campagnes</h1>
-    <button class="primary" onclick={() => (screen = { name: 'new' })}>Nouvelle campagne</button>
+    <h1>{t('camps.title')}</h1>
+    <button class="primary" onclick={() => (screen = { name: 'new' })}>{t('camps.new')}</button>
   </div>
-  <p class="muted">Envois en masse depuis un fichier CSV, avec simulation préalable.</p>
+  <p class="muted">{t('camps.subtitle')}</p>
 
   {#if error}<div class="alert error" role="alert">{error}</div>{/if}
 
@@ -66,26 +67,26 @@
   <div class="cmain">
   {#if list.length > 0}
     <div class="stats">
-      <div class="stat"><div class="n">{stats.count}</div><div class="small muted">campagne(s)</div></div>
-      <div class="stat"><div class="n">{stats.active}</div><div class="small muted">en cours</div></div>
-      <div class="stat"><div class="n">{stats.sent}</div><div class="small muted">SMS envoyés</div></div>
-      <div class="stat"><div class="n" style:color={stats.failed ? 'var(--danger)' : undefined}>{stats.failed}</div><div class="small muted">échecs</div></div>
-      <div class="stat"><div class="n">{stats.credits}</div><div class="small muted">crédits consommés</div></div>
+      <div class="stat"><div class="n">{stats.count}</div><div class="small muted">{t('camps.stat_count')}</div></div>
+      <div class="stat"><div class="n">{stats.active}</div><div class="small muted">{t('camps.stat_active')}</div></div>
+      <div class="stat"><div class="n">{stats.sent}</div><div class="small muted">{t('camps.stat_sent')}</div></div>
+      <div class="stat"><div class="n" style:color={stats.failed ? 'var(--danger)' : undefined}>{stats.failed}</div><div class="small muted">{t('camps.stat_failed')}</div></div>
+      <div class="stat"><div class="n">{stats.credits}</div><div class="small muted">{t('camps.stat_credits')}</div></div>
     </div>
   {/if}
   {#if loaded && list.length === 0 && !error}
-    <div class="card muted">Aucune campagne pour l'instant. Cliquez sur « Nouvelle campagne » pour importer un CSV, ou téléchargez d'abord le modèle.</div>
+    <div class="card muted">{t('camps.empty')}</div>
   {:else}
     <div class="card" style="padding: 0; overflow: hidden">
       {#each list as c (c.id)}
         <button class="item" onclick={() => (screen = { name: 'detail', id: c.id })}>
           <div class="grow">
             <div><strong>{c.name}</strong> <span class="badge">{modeLabel[c.mode]}</span></div>
-            <div class="small muted">{dateFr(c.createdAt)} · {c.total} destinataire(s) · {c.credits} crédit(s)</div>
+            <div class="small muted">{t('camps.row_meta', { date: dateFr(c.createdAt), total: c.total, credits: c.credits })}</div>
           </div>
           <div class="prog">
             <div class="bar"><div class="fill" class:bad={c.status === 'failed'} style="width: {pct(c)}%"></div></div>
-            <div class="small muted">{c.sent + c.failed}/{c.total}{#if c.failed} · <span style="color: var(--danger)">{c.failed} échec(s)</span>{/if}</div>
+            <div class="small muted">{c.sent + c.failed}/{c.total}{#if c.failed} · <span style="color: var(--danger)">{t('camps.failures', { count: c.failed })}</span>{/if}</div>
           </div>
           <span class="badge" class:accent={c.status === 'running'}>{statusLabel[c.status] ?? c.status}</span>
         </button>
@@ -96,25 +97,23 @@
 
   <aside class="chelp">
     <div class="card">
-      <h2>Fichier CSV</h2>
-      <p class="muted small">Première ligne = en-têtes. Une colonne contient le numéro (06…, +33…). Séparateur <code>;</code> <code>,</code> ou tabulation, UTF-8 ou Excel.</p>
-      <pre class="ex">telephone;prenom;ville
-0612345678;Jean;Lyon
-+33698765432;Léa;Paris</pre>
+      <h2>{t('camps.csv_title')}</h2>
+      <p class="muted small">{t('camps.csv_a')} <code>;</code> <code>,</code> {t('camps.csv_b')}</p>
+      <pre class="ex">{t('camps.csv_example')}</pre>
       <div class="row wrap" style="gap: 8px"><CsvTemplate /></div>
     </div>
     <div class="card">
-      <h2>Variables</h2>
-      <p class="muted small" style="margin: 0">Dans le message, <code>{'{prenom}'}</code> est remplacé par la valeur de la colonne <code>prenom</code> de chaque ligne. Le nom doit correspondre à l'en-tête du CSV.</p>
+      <h2>{t('camps.vars_title')}</h2>
+      <p class="muted small" style="margin: 0">{t('camps.vars_a')} <code>{'{' + t('camps.var_name') + '}'}</code> {t('camps.vars_b')} <code>{t('camps.var_name')}</code> {t('camps.vars_c')}</p>
     </div>
     <div class="card">
-      <h2>Deux modes d'envoi</h2>
-      <p class="small" style="margin: 0 0 8px"><strong>Lot (batch)</strong> <span class="muted">: même message pour tous, traité côté OVH, rapide. Pas de pause possible.</span></p>
-      <p class="small" style="margin: 0"><strong>Personnalisé</strong> <span class="muted">: un SMS par destinataire (variables), débit réglable, pause / reprise / annulation. Imposé dès qu'il y a des variables.</span></p>
+      <h2>{t('camps.modes_title')}</h2>
+      <p class="small" style="margin: 0 0 8px"><strong>{t('camps.batch_title')}</strong><span class="muted">{t('camps.batch_text')}</span></p>
+      <p class="small" style="margin: 0"><strong>{t('mode.local')}</strong><span class="muted">{t('camps.custom_text')}</span></p>
     </div>
     <div class="card">
-      <h2>Avant d'envoyer</h2>
-      <p class="muted small" style="margin: 0">Une simulation (sans envoi) affiche automatiquement les numéros invalides, les doublons, le nombre de SMS, le coût estimé et la durée.</p>
+      <h2>{t('camps.before_title')}</h2>
+      <p class="muted small" style="margin: 0">{t('camps.before_text')}</p>
     </div>
   </aside>
   </div>

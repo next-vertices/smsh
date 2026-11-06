@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"smsh/internal/i18n"
 	"smsh/internal/ovh"
 )
 
@@ -191,7 +192,7 @@ func (m *Manager) Resolve(in Input) (Account, Secrets, error) {
 			sec.ConsumerKey = cur.ConsumerKey
 		}
 		if sec.AppKey == "" || sec.AppSecret == "" || sec.ConsumerKey == "" {
-			return Account{}, Secrets{}, &ValidationError{"Secrets manquants : renseignez les trois clés."}
+			return Account{}, Secrets{}, &ValidationError{i18n.T("creds.secrets_missing")}
 		}
 	}
 	return acc, sec, nil

@@ -2,6 +2,7 @@
   import AccountForm from '../components/AccountForm.svelte'
   import { refreshAll } from '../lib/actions'
   import { ui } from '../lib/state.svelte'
+  import { t } from '../lib/i18n.svelte'
 
   async function saved() {
     await refreshAll()
@@ -11,11 +12,8 @@
 
 <div class="wrap">
   <div class="card">
-    <h1>Bienvenue dans Smsh</h1>
-    <p class="muted">
-      Configurez votre premier compte OVH. Vos clés sont stockées dans le coffre de votre système
-      et ne quittent jamais cet ordinateur.
-    </p>
+    <h1>{t('onboarding.title')}</h1>
+    <p class="muted">{t('onboarding.text')}</p>
     <AccountForm onsaved={saved} />
   </div>
 </div>

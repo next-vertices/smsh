@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"smsh/internal/i18n"
 	"smsh/internal/service"
 )
 
@@ -18,14 +19,12 @@ func sendCmd() *cobra.Command {
 		stop, yes, dry            bool
 	)
 	c := &cobra.Command{
-		Use:   "send <numéro>... [flags]",
-		Short: "Envoie un SMS à 5 numéros au maximum (utilisez « campaign run » pour plus)",
-		Example: `  smsh send 0612345678 -m "Bonjour"
-  smsh send +33612345678 +14155552671 -f message.txt --yes
-  echo "Rappel" | smsh send 0612345678 -f - --at "2026-11-06 09:00" --yes`,
+		Use:     i18n.T("cli.send_usage"),
+		Short:   i18n.T("cli.send_short"),
+		Example: i18n.T("cli.send_example"),
 		Args: func(_ *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return usagef("indiquez au moins un numéro")
+				return usagef("%s", i18n.T("cli.send_need_number"))
 			}
 			return nil
 		},
@@ -43,27 +42,27 @@ func sendCmd() *cobra.Command {
 				defer cancel()
 				est, estErr := svc.EstimateCost(cctx, service.CostInput{Message: in.Message, Recipients: in.Recipients, StopClause: in.StopClause})
 				if !asJSON {
-					fmt.Fprintf(os.Stderr, "Message      : %s\n", trunc(msg, 100))
-					fmt.Fprintf(os.Stderr, "Destinataires: %s\n", strings.Join(args, ", "))
+					fmt.Fprintln(os.Stderr, i18n.T("cli.l_message", i18n.P{"v": trunc(msg, 100)}))
+					fmt.Fprintln(os.Stderr, i18n.T("cli.l_recipients", i18n.P{"v": strings.Join(args, ", ")}))
 					if estErr == nil && est.Recipients > 0 {
-						fmt.Fprintf(os.Stderr, "Segments     : %d (%s, %d caractères)\n", est.Parts, est.Encoding, est.Characters)
-						fmt.Fprintf(os.Stderr, "Coût estimé  : %v crédit(s) ≈ %s HT\n", est.TotalCredits, euro(est.PriceMin, est.PriceMax, est.Currency))
+						fmt.Fprintln(os.Stderr, i18n.T("cli.l_segments", i18n.P{"parts": est.Parts, "encoding": est.Encoding, "chars": est.Characters}))
+						fmt.Fprintln(os.Stderr, i18n.T("cli.l_cost", i18n.P{"credits": est.TotalCredits, "price": euro(est.PriceMin, est.PriceMax, est.Currency)}))
 					} else if estErr != nil {
-						fmt.Fprintf(os.Stderr, "Coût         : non estimé (%s)\n", service.Describe(estErr).Message)
+						fmt.Fprintln(os.Stderr, i18n.T("cli.l_cost_na", i18n.P{"error": service.Describe(estErr).Message}))
 					}
 					if in.SendAt != "" {
-						fmt.Fprintf(os.Stderr, "Envoi différé: %s\n", in.SendAt)
+						fmt.Fprintln(os.Stderr, i18n.T("cli.l_scheduled", i18n.P{"v": in.SendAt}))
 					}
 				}
 				if dry {
 					if asJSON {
 						printJSON(os.Stdout, map[string]any{"dryRun": true, "estimate": est})
 					} else {
-						fmt.Fprintln(os.Stderr, "Simulation : rien n'a été envoyé.")
+						fmt.Fprintln(os.Stderr, i18n.T("cli.dry_done"))
 					}
 					return nil
 				}
-				if err := confirm("Envoyer ?", yes); err != nil {
+				if err := confirm(i18n.T("cli.confirm_send"), yes); err != nil {
 					return err
 				}
 				out, err := svc.Send(cctx, in)
@@ -74,26 +73,26 @@ func sendCmd() *cobra.Command {
 					printJSON(os.Stdout, out)
 					return nil
 				}
-				verb := "envoyé(s)"
+				verb := i18n.T("cli.verb_sent")
 				if out.Scheduled {
-					verb = "programmé(s)"
+					verb = i18n.T("cli.verb_scheduled")
 				}
-				fmt.Printf("%d SMS %s à %s — %v crédit(s) débité(s)\n", len(out.Sent), verb, strings.Join(out.Sent, ", "), out.CreditsRemoved)
+				fmt.Println(i18n.T("cli.sent_line", i18n.P{"count": len(out.Sent), "verb": verb, "numbers": strings.Join(out.Sent, ", "), "credits": out.CreditsRemoved}))
 				if len(out.Rejected) > 0 {
-					fmt.Printf("Refusé(s) par OVH : %s\n", strings.Join(out.Rejected, ", "))
-					return failf("%d destinataire(s) refusé(s)", len(out.Rejected))
+					fmt.Println(i18n.T("cli.rejected_line", i18n.P{"numbers": strings.Join(out.Rejected, ", ")}))
+					return failf("%s", i18n.T("cli.rejected_err", i18n.P{"count": len(out.Rejected)}))
 				}
 				return nil
 			})
 		},
 	}
 	f := c.Flags()
-	f.StringVarP(&message, "message", "m", "", "texte du SMS")
-	f.StringVarP(&file, "file", "f", "", "lire le message dans un fichier (« - » : entrée standard)")
-	f.StringVar(&sender, "sender", "", "expéditeur (vide : numéro court par défaut)")
-	f.StringVar(&at, "at", "", "envoi différé : « 2026-11-06 09:00 » (heure locale) ou RFC 3339")
-	f.BoolVar(&stop, "stop", false, "ajouter la mention STOP (SMS commercial)")
-	f.BoolVarP(&yes, "yes", "y", false, "ne pas demander de confirmation")
-	f.BoolVar(&dry, "dry-run", false, "afficher le coût sans envoyer")
+	f.StringVarP(&message, "message", "m", "", i18n.T("cli.fl_message"))
+	f.StringVarP(&file, "file", "f", "", i18n.T("cli.fl_file"))
+	f.StringVar(&sender, "sender", "", i18n.T("cli.fl_sender"))
+	f.StringVar(&at, "at", "", i18n.T("cli.fl_at_send"))
+	f.BoolVar(&stop, "stop", false, i18n.T("cli.fl_stop"))
+	f.BoolVarP(&yes, "yes", "y", false, i18n.T("cli.fl_yes"))
+	f.BoolVar(&dry, "dry-run", false, i18n.T("cli.fl_dry_send"))
 	return c
 }
