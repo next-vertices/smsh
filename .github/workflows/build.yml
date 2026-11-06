@@ -120,7 +120,7 @@ jobs:
           mkdir dist
           ditto -c -k --keepParent build/bin/smsh.app "dist/smsh_${VERSION}_macos_universal.zip"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: smsh-${{ matrix.name }}
           path: dist/*
