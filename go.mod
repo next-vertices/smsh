@@ -9,7 +9,7 @@ require (
 	github.com/spf13/pflag v1.0.9
 	github.com/wailsapp/wails/v2 v2.17.1
 	github.com/zalando/go-keyring v0.2.8
-	golang.org/x/term v0.47.0
+	golang.org/x/term v0.48.0
 	golang.org/x/text v0.43.0
 	modernc.org/sqlite v1.61.1
 )
@@ -49,7 +49,7 @@ require (
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
